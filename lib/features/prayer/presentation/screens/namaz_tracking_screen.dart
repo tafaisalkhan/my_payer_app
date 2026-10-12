@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mynamaz_scheduler/core/ads/ad_service.dart';
 import 'package:mynamaz_scheduler/core/notifications/notification_service.dart';
 import 'package:mynamaz_scheduler/core/theme/app_theme.dart';
 import 'package:mynamaz_scheduler/core/utils/date_formatter.dart';
 import 'package:mynamaz_scheduler/features/prayer/domain/models/prayer_record.dart';
 import 'package:mynamaz_scheduler/features/prayer/domain/models/prayer_timing.dart';
 import 'package:mynamaz_scheduler/features/prayer/presentation/providers/prayer_providers.dart';
+import 'package:mynamaz_scheduler/shared/widgets/banner_ad_widget.dart';
 
 class NamazTrackingScreen extends ConsumerWidget {
   const NamazTrackingScreen({super.key});
@@ -194,6 +196,7 @@ class NamazTrackingScreen extends ConsumerWidget {
                                       status: PrayerStatus.onTime,
                                       takbirEUla: isTakbir,
                                     );
+                                AdService.instance.showInterstitialAd();
                               },
                             ),
                             ChoiceChip(
@@ -216,6 +219,7 @@ class NamazTrackingScreen extends ConsumerWidget {
                                       status: PrayerStatus.qada,
                                       takbirEUla: isTakbir,
                                     );
+                                AdService.instance.showInterstitialAd();
                               },
                             ),
                             ChoiceChip(
@@ -264,6 +268,107 @@ class NamazTrackingScreen extends ConsumerWidget {
                   ),
                 );
               }).toList(),
+            ),
+            const SizedBox(height: 16),
+
+            // 3. Rewarded Ad Feature Card
+            _buildRewardedAdCard(context),
+            const SizedBox(height: 12),
+
+            // 4. In-Screen Banner Ad
+            const BannerAdWidget(),
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRewardedAdCard(BuildContext context) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: LinearGradient(
+            colors: [
+              AppTheme.emeraldPrimary.withValues(alpha: 0.05),
+              AppTheme.goldAccent.withValues(alpha: 0.12),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          border: Border.all(
+            color: AppTheme.goldAccent.withValues(alpha: 0.3),
+            width: 1,
+          ),
+        ),
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.goldAccent.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.card_giftcard, color: AppTheme.goldAccent, size: 24),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '🎁 Support App & Earn Blessing Points',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Watch a short rewarded video ad to earn rewards and support free Islamic app features.',
+                        style: TextStyle(fontSize: 12, color: Colors.black87),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.emeraldPrimary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                icon: const Icon(Icons.play_circle_fill, size: 20, color: AppTheme.goldLight),
+                label: const Text(
+                  'Watch Rewarded Ad',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                onPressed: () {
+                  AdService.instance.showRewardedAd(
+                    onUserEarnedReward: (reward) {
+                      ScaffoldMessenger.of(context).clearSnackBars();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('🎉 JazakAllah Khair! You earned ${reward.amount.toInt()} blessing points.'),
+                          backgroundColor: AppTheme.emeraldPrimary,
+                          duration: const Duration(seconds: 4),
+                        ),
+                      );
+                    },
+                    onDismissed: () {
+                      debugPrint('Rewarded ad closed.');
+                    },
+                  );
+                },
+              ),
             ),
           ],
         ),

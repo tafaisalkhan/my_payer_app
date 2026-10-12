@@ -8,6 +8,7 @@ import 'package:mynamaz_scheduler/features/prayer/presentation/screens/namaz_tra
 import 'package:mynamaz_scheduler/features/qibla/presentation/screens/qibla_compass_screen.dart';
 import 'package:mynamaz_scheduler/features/quran/presentation/screens/quran_scheduler_screen.dart';
 import 'package:mynamaz_scheduler/features/tasks/presentation/screens/task_scheduler_screen.dart';
+import 'package:mynamaz_scheduler/shared/widgets/banner_ad_widget.dart';
 
 final currentTabProvider = StateProvider<int>((ref) => 0);
 
@@ -137,37 +138,43 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
             ),
           ],
         ),
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: currentIndex,
-          onDestinationSelected: (index) {
-            ref.read(currentTabProvider.notifier).state = index;
-          },
-          indicatorColor: AppTheme.emeraldPrimary.withValues(alpha: 0.15),
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home, color: AppTheme.emeraldPrimary),
-              label: 'Home',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.access_time_outlined),
-              selectedIcon: Icon(Icons.access_time_filled, color: AppTheme.emeraldPrimary),
-              label: 'Namaz',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.menu_book_outlined),
-              selectedIcon: Icon(Icons.menu_book, color: AppTheme.emeraldPrimary),
-              label: 'Quran',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.explore_outlined),
-              selectedIcon: Icon(Icons.explore, color: AppTheme.emeraldPrimary),
-              label: 'Qibla',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.task_alt_outlined),
-              selectedIcon: Icon(Icons.task_alt, color: AppTheme.emeraldPrimary),
-              label: 'Tasks',
+        bottomNavigationBar: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const BannerAdWidget(),
+            NavigationBar(
+              selectedIndex: currentIndex,
+              onDestinationSelected: (index) {
+                ref.read(currentTabProvider.notifier).state = index;
+              },
+              indicatorColor: AppTheme.emeraldPrimary.withValues(alpha: 0.15),
+              destinations: const [
+                NavigationDestination(
+                  icon: Icon(Icons.home_outlined),
+                  selectedIcon: Icon(Icons.home, color: AppTheme.emeraldPrimary),
+                  label: 'Home',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.access_time_outlined),
+                  selectedIcon: Icon(Icons.access_time_filled, color: AppTheme.emeraldPrimary),
+                  label: 'Namaz',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.menu_book_outlined),
+                  selectedIcon: Icon(Icons.menu_book, color: AppTheme.emeraldPrimary),
+                  label: 'Quran',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.explore_outlined),
+                  selectedIcon: Icon(Icons.explore, color: AppTheme.emeraldPrimary),
+                  label: 'Qibla',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.task_alt_outlined),
+                  selectedIcon: Icon(Icons.task_alt, color: AppTheme.emeraldPrimary),
+                  label: 'Tasks',
+                ),
+              ],
             ),
           ],
         ),

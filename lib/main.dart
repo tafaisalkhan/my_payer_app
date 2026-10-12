@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mynamaz_scheduler/core/ads/ad_service.dart';
 import 'package:mynamaz_scheduler/core/notifications/notification_service.dart';
 import 'package:mynamaz_scheduler/core/routing/app_router.dart';
 import 'package:mynamaz_scheduler/core/theme/app_theme.dart';
@@ -11,6 +12,9 @@ void main() async {
 
   // Initialize notifications & timezone
   await NotificationService.instance.initialize();
+
+  // Initialize Google Mobile Ads SDK
+  await AdService.instance.initialize();
 
   // Create router instance with onboarding check
   final router = await AppRouter.createRouter();

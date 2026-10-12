@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mynamaz_scheduler/core/ads/ad_service.dart';
 import 'package:mynamaz_scheduler/core/notifications/notification_service.dart';
 import 'package:mynamaz_scheduler/core/theme/app_theme.dart';
 import 'package:mynamaz_scheduler/features/prayer/data/repositories/prayer_repository.dart';
@@ -342,6 +343,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           const SizedBox(height: 20),
 
+          _buildSectionHeader('Premium Features'),
+          _buildRemoveAdsCard(context),
+          const SizedBox(height: 20),
+
           _buildSectionHeader('Data & Privacy'),
           Card(
             child: Column(
@@ -629,5 +634,203 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildRemoveAdsCard(BuildContext context) {
+    return ValueListenableBuilder<bool>(
+      valueListenable: AdService.instance.isAdsRemovedNotifier,
+      builder: (context, isRemoved, _) {
+        if (isRemoved) {
+          return Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            color: Colors.green.shade50,
+            child: const ListTile(
+              leading: Icon(Icons.verified, color: Colors.green, size: 28),
+              title: Text('Ads Removed (Premium Active)', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: Text('All ads have been permanently disabled across the entire app.'),
+              trailing: Chip(
+                label: Text('ACTIVE', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 11)),
+                backgroundColor: Colors.white,
+              ),
+            ),
+          );
+        }
+
+        return Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              gradient: LinearGradient(
+                colors: [
+                  AppTheme.emeraldPrimary.withValues(alpha: 0.08),
+                  AppTheme.goldAccent.withValues(alpha: 0.15),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              border: Border.all(color: AppTheme.goldAccent.withValues(alpha: 0.4), width: 1.5),
+            ),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppTheme.goldAccent.withValues(alpha: 0.2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.block, color: AppTheme.goldAccent, size: 24),
+                        ),
+                        const SizedBox(width: 12),
+                        const Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Remove All Ads',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                            ),
+                            Text(
+                              'Product: remove_ads',
+                              style: TextStyle(fontSize: 12, color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppTheme.goldAccent,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Text(
+                        r'$4.99',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Enjoy a 100% ad-free experience. Removes banners, interstitial, and video ads permanently across all screens.',
+                  style: TextStyle(fontSize: 13, height: 1.4),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.emeraldPrimary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        icon: const Icon(Icons.shopping_bag_outlined, size: 18),
+                        label: const Text(
+                          'Buy (Remove Ads \$4.99)',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        onPressed: () => _handleRemoveAdsPurchase(context),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    TextButton(
+                      onPressed: () => _handleRestorePurchases(context),
+                      child: const Text('Restore', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _handleRemoveAdsPurchase(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.shopping_cart, color: AppTheme.emeraldPrimary),
+            SizedBox(width: 8),
+            Text('Confirm Purchase'),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Product: remove_ads', style: TextStyle(fontWeight: FontWeight.bold)),
+            Text('Price: \$4.99 (One-time payment)'),
+            SizedBox(height: 12),
+            Text('Permanently remove all banner, interstitial, and rewarded ads from My Namaz Scheduler.'),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.emeraldPrimary),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Purchase \$4.99', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final success = await AdService.instance.purchaseRemoveAds();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('🎉 Purchase successful! All ads have been permanently removed.'),
+              backgroundColor: AppTheme.emeraldPrimary,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Purchase could not be completed. Please try again.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _handleRestorePurchases(BuildContext context) async {
+    final isRestored = await AdService.instance.restorePurchases();
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      if (isRestored) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Previous purchase "remove_ads" restored successfully!'),
+            backgroundColor: AppTheme.emeraldPrimary,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No previous "remove_ads" purchase found on this device.'),
+          ),
+        );
+      }
+    }
   }
 }

@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:mynamaz_scheduler/core/constants/app_constants.dart';
 import 'package:mynamaz_scheduler/core/location/location_service.dart';
 import 'package:mynamaz_scheduler/core/notifications/notification_service.dart';
 import 'package:mynamaz_scheduler/core/utils/prayer_time_helper.dart';

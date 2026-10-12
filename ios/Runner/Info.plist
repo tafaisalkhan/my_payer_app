@@ -30,6 +30,8 @@
 	<string>My Namaz Scheduler requires location access to calculate accurate daily prayer times and Qibla direction for your location.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>My Namaz Scheduler uses your location to calculate accurate prayer times and Qibla direction.</string>
+	<key>GADApplicationIdentifier</key>
+	<string>ca-app-pub-3940256099942544~1458002511</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

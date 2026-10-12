@@ -44,9 +44,12 @@ Welcome to **My Namaz Scheduler** ("we", "our", or "us"). We are committed to pr
 
 ---
 
-## 4. Third-Party Services & Libraries
+## 4. Advertising & Third-Party SDKs (Google AdMob)
 
-Our application does not integrate third-party advertising SDKs, behavioral analytics (such as Facebook SDK, Google AdMob, or Firebase Analytics tracking), or tracking cookies.
+To support free ongoing maintenance and development of Islamic features, our application integrates **Google Mobile Ads (Google AdMob)** to display banner, interstitial, and optional rewarded video ads.
+* **AdMob Data Processing:** Google AdMob may process your device's Google Advertising ID (AAID) and network diagnostics solely to serve and measure non-personalized or contextual ads in compliance with Google Play Developer Policies.
+* **Ad Types:** Banner ads, interstitial transitions between prayer tracking records, and voluntary rewarded video ads.
+* **Google's Privacy Policy:** You can review Google's advertising policies at [https://policies.google.com/technologies/ads](https://policies.google.com/technologies/ads).
 
 We utilize open-source computational libraries:
 * **Adhan Library:** Mathematical computation of Islamic prayer times based on solar coordinates.
