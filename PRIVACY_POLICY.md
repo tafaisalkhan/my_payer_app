@@ -79,8 +79,11 @@ We may update our Privacy Policy periodically to reflect app updates or regulato
 
 ---
 
-## 8. Contact Us
+## 8. App Information & Contact Us
 
-If you have questions, feedback, or inquiries regarding this Privacy Policy or the app, please open an issue on our GitHub repository:
-- **Repository:** [https://github.com/tafaisalkhan/my_payer_app](https://github.com/tafaisalkhan/my_payer_app)
-- **Email:** support@mynamazscheduler.app
+* **App Name:** My Namaz Scheduler
+* **Android Package Name (Application ID):** `com.mynamaz.scheduler`
+* **GitHub Repository:** [https://github.com/tafaisalkhan/my_payer_app](https://github.com/tafaisalkhan/my_payer_app)
+* **Contact Email:** [muhammadfaysal.khan7@gmail.com](mailto:muhammadfaysal.khan7@gmail.com)
+
+If you have questions, feedback, or inquiries regarding this Privacy Policy or the app, please feel free to email us directly or open an issue on the GitHub repository.

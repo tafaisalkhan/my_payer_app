@@ -1,4 +1,4 @@
-package com.mynamaz.scheduler.mynamaz_scheduler
+package com.mynamaz.scheduler
 
 import android.content.BroadcastReceiver
 import android.content.Context

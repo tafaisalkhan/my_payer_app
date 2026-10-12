@@ -1,4 +1,4 @@
-package com.mynamaz.scheduler.mynamaz_scheduler
+package com.mynamaz.scheduler
 
 import android.app.AlarmManager
 import android.app.Notification

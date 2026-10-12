@@ -1,4 +1,4 @@
-package com.mynamaz.scheduler.mynamaz_scheduler
+package com.mynamaz.scheduler
 
 import android.app.Notification
 import android.app.NotificationChannel
