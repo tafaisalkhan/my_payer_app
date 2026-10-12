@@ -1,17 +1,18 @@
 import 'package:go_router/go_router.dart';
 import 'package:mynamaz_scheduler/features/onboarding/presentation/screens/onboarding_screen.dart';
+import 'package:mynamaz_scheduler/features/onboarding/presentation/screens/splash_screen.dart';
 import 'package:mynamaz_scheduler/features/settings/presentation/screens/settings_screen.dart';
 import 'package:mynamaz_scheduler/shared/widgets/main_shell_screen.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class AppRouter {
   static Future<GoRouter> createRouter() async {
-    final prefs = await SharedPreferences.getInstance();
-    final bool onboardingCompleted = prefs.getBool('onboarding_completed') ?? false;
-
     return GoRouter(
-      initialLocation: onboardingCompleted ? '/' : '/onboarding',
+      initialLocation: '/splash',
       routes: [
+        GoRoute(
+          path: '/splash',
+          builder: (context, state) => const SplashScreen(),
+        ),
         GoRoute(
           path: '/onboarding',
           builder: (context, state) => const OnboardingScreen(),
