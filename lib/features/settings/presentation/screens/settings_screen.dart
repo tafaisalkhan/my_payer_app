@@ -347,6 +347,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             child: Column(
               children: [
                 ListTile(
+                  leading: const Icon(Icons.privacy_tip_outlined, color: AppTheme.emeraldPrimary),
+                  title: const Text('Privacy Policy'),
+                  subtitle: const Text('Review offline & local-first data protection'),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+                  onTap: () => _showPrivacyPolicyDialog(context),
+                ),
+                const Divider(),
+                ListTile(
                   leading: const Icon(Icons.backup, color: AppTheme.emeraldPrimary),
                   title: const Text('Backup / Export Data'),
                   subtitle: const Text('Export local database and history'),
@@ -573,6 +581,50 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               );
             },
             child: const Text('Clear All', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPrivacyPolicyDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.security, color: AppTheme.emeraldPrimary),
+            SizedBox(width: 8),
+            Text('Privacy Policy'),
+          ],
+        ),
+        content: const SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Local-First & Offline Privacy',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'My Namaz Scheduler is designed with strict privacy principles:\n\n'
+                '• No Account Needed: We never ask for your email, phone number, or identity.\n\n'
+                '• Local GPS Only: Coordinates are processed exclusively on your device to calculate accurate astronomical prayer times and Qibla bearing. Location coordinates are never transmitted to any server.\n\n'
+                '• Zero Analytics or Ads: We do not integrate advertising SDKs, tracking cookies, or external analytics.\n\n'
+                '• Audio Focus: Used strictly to pause background media during prayer Adhan and automatically resume your media afterwards.\n\n'
+                '• 100% Local Storage: Prayer records, Quran recitation history, and work tasks are saved locally on your device in SQLite.\n\n'
+                'You can export or permanently wipe your local records at any time.',
+                style: TextStyle(fontSize: 13, height: 1.4),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
           ),
         ],
       ),
