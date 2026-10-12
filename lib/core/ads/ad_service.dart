@@ -10,6 +10,7 @@ class AdService {
   static const String productIdRemoveAds = 'remove_ads';
   static const String priceRemoveAds = r'$4.99';
   static const String _prefKeyRemoveAds = 'is_ads_removed';
+  static const String _prefKeyRewardAdFreeUntil = 'reward_ad_free_until';
 
   bool _isInitialized = false;
   InterstitialAd? _interstitialAd;
@@ -18,46 +19,78 @@ class AdService {
   RewardedAd? _rewardedAd;
   bool _isRewardedLoading = false;
 
+  DateTime? _rewardAdFreeUntil;
+  DateTime? get rewardAdFreeUntil => _rewardAdFreeUntil;
+
   final ValueNotifier<bool> isAdsRemovedNotifier = ValueNotifier<bool>(false);
 
-  bool get isAdsRemoved => isAdsRemovedNotifier.value;
+  /// Checks if either lifetime purchase is active OR temporary rewarded ad-free is active
+  bool get isAdsRemoved {
+    if (isAdsRemovedNotifier.value) return true;
+    if (isRewardAdFreeActive) return true;
+    return false;
+  }
 
-  /// Official Google AdMob Test Ad Unit IDs
+  bool get isRewardAdFreeActive {
+    return _rewardAdFreeUntil != null && DateTime.now().isBefore(_rewardAdFreeUntil!);
+  }
+
+  String get remainingRewardAdFreeText {
+    if (!isRewardAdFreeActive) return '';
+    final diff = _rewardAdFreeUntil!.difference(DateTime.now());
+    final hours = diff.inHours;
+    final minutes = diff.inMinutes % 60;
+    if (hours > 0) {
+      return '${hours}h ${minutes}m left';
+    }
+    return '${minutes}m left';
+  }
+
+  /// User Google AdMob App ID: ca-app-pub-1852108665659812~6416657460
+  static const String appId = 'ca-app-pub-1852108665659812~6416657460';
+  static const String bannerId = 'ca-app-pub-1852108665659812/2589093096';
+  static const String interstitialId = 'ca-app-pub-1852108665659812/3598922433';
+  static const String rewardId = 'ca-app-pub-1852108665659812/2520635328';
+
   static String get bannerAdUnitId {
     if (kIsWeb) return '';
-    if (Platform.isAndroid) {
-      return 'ca-app-pub-3940256099942544/6300978111'; // Android Banner Test ID
-    } else if (Platform.isIOS) {
-      return 'ca-app-pub-3940256099942544/2934735716'; // iOS Banner Test ID
-    }
-    return '';
+    return bannerId;
   }
 
   static String get interstitialAdUnitId {
     if (kIsWeb) return '';
-    if (Platform.isAndroid) {
-      return 'ca-app-pub-3940256099942544/1033173712'; // Android Interstitial Test ID
-    } else if (Platform.isIOS) {
-      return 'ca-app-pub-3940256099942544/4411468910'; // iOS Interstitial Test ID
-    }
-    return '';
+    return interstitialId;
   }
 
   static String get rewardedAdUnitId {
     if (kIsWeb) return '';
-    if (Platform.isAndroid) {
-      return 'ca-app-pub-3940256099942544/5224354917'; // Android Rewarded Test ID
-    } else if (Platform.isIOS) {
-      return 'ca-app-pub-3940256099942544/1712485313'; // iOS Rewarded Test ID
+    return rewardId;
+  }
+
+  int _navigationCount = 0;
+  static const int _interstitialNavigationFrequency = 4; // Trigger on every 4 to 5 navigations
+
+  /// Tracks screen or tab navigation and shows interstitial every 4 to 5 navigations
+  void registerNavigationAndMaybeShowInterstitial() {
+    if (isAdsRemoved) return;
+    _navigationCount++;
+    debugPrint('AdService: Navigation count = $_navigationCount / $_interstitialNavigationFrequency');
+    if (_navigationCount >= _interstitialNavigationFrequency) {
+      _navigationCount = 0;
+      showInterstitialAd();
     }
-    return '';
   }
 
   Future<void> initialize() async {
     if (_isInitialized) return;
     try {
       final prefs = await SharedPreferences.getInstance();
-      isAdsRemovedNotifier.value = prefs.getBool(_prefKeyRemoveAds) ?? false;
+      final untilMs = prefs.getInt(_prefKeyRewardAdFreeUntil);
+      if (untilMs != null) {
+        _rewardAdFreeUntil = DateTime.fromMillisecondsSinceEpoch(untilMs);
+      }
+      final isLifetime = prefs.getBool(_prefKeyRemoveAds) ?? false;
+      isAdsRemovedNotifier.value = isLifetime || isRewardAdFreeActive;
 
       if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
         await MobileAds.instance.initialize();
@@ -98,8 +131,30 @@ class AdService {
   Future<bool> restorePurchases() async {
     final prefs = await SharedPreferences.getInstance();
     final bool removed = prefs.getBool(_prefKeyRemoveAds) ?? false;
-    isAdsRemovedNotifier.value = removed;
-    return removed;
+    isAdsRemovedNotifier.value = removed || isRewardAdFreeActive;
+    return removed || isRewardAdFreeActive;
+  }
+
+  /// Grants 24 hours of ad-free experience as a reward for watching a Rewarded Ad
+  Future<void> grantRewardAdFreeHours([int hours = 24]) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final now = DateTime.now();
+      final base = (_rewardAdFreeUntil != null && now.isBefore(_rewardAdFreeUntil!))
+          ? _rewardAdFreeUntil!
+          : now;
+      final newUntil = base.add(Duration(hours: hours));
+      _rewardAdFreeUntil = newUntil;
+      await prefs.setInt(_prefKeyRewardAdFreeUntil, newUntil.millisecondsSinceEpoch);
+      isAdsRemovedNotifier.value = true;
+
+      // Dispose preloaded interstitial
+      _interstitialAd?.dispose();
+      _interstitialAd = null;
+      debugPrint('Granted $hours hours ad-free reward until $newUntil');
+    } catch (e) {
+      debugPrint('Error granting reward: $e');
+    }
   }
 
   /// 1. BANNER AD CREATOR

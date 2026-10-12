@@ -31,7 +31,7 @@
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>My Namaz Scheduler uses your location to calculate accurate prayer times and Qibla direction.</string>
 	<key>GADApplicationIdentifier</key>
-	<string>ca-app-pub-3940256099942544~1458002511</string>
+	<string>ca-app-pub-1852108665659812~6416657460</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mynamaz_scheduler/core/ads/ad_service.dart';
+import 'package:mynamaz_scheduler/shared/widgets/banner_ad_widget.dart';
 import 'package:mynamaz_scheduler/core/notifications/notification_service.dart';
 import 'package:mynamaz_scheduler/core/theme/app_theme.dart';
 import 'package:mynamaz_scheduler/features/prayer/data/repositories/prayer_repository.dart';
@@ -390,6 +391,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 30),
         ],
       ),
+      bottomNavigationBar: const BannerAdWidget(),
     );
   }
 
@@ -641,16 +643,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       valueListenable: AdService.instance.isAdsRemovedNotifier,
       builder: (context, isRemoved, _) {
         if (isRemoved) {
+          final isReward = AdService.instance.isRewardAdFreeActive;
           return Card(
-            elevation: 2,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             color: Colors.green.shade50,
-            child: const ListTile(
-              leading: Icon(Icons.verified, color: Colors.green, size: 28),
-              title: Text('Ads Removed (Premium Active)', style: TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text('All ads have been permanently disabled across the entire app.'),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(color: Colors.green.shade300),
+            ),
+            child: ListTile(
+              leading: const Icon(Icons.verified, color: Colors.green, size: 28),
+              title: Text(
+                isReward ? '24h Ad-Free Reward Active' : 'Ads Removed (Premium Active)',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              subtitle: Text(
+                isReward
+                    ? 'All ads disabled via Rewarded Ad (${AdService.instance.remainingRewardAdFreeText}). Tap below to extend!'
+                    : 'All ads have been permanently disabled across the entire app.',
+              ),
               trailing: Chip(
-                label: Text('ACTIVE', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 11)),
+                label: Text(
+                  isReward ? AdService.instance.remainingRewardAdFreeText : 'ACTIVE',
+                  style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 11),
+                ),
                 backgroundColor: Colors.white,
               ),
             ),
@@ -721,7 +736,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
                 const SizedBox(height: 12),
                 const Text(
-                  'Enjoy a 100% ad-free experience. Removes banners, interstitial, and video ads permanently across all screens.',
+                  'Enjoy a 100% ad-free experience. Removes banners, interstitial, and video ads across all screens & settings.',
                   style: TextStyle(fontSize: 13, height: 1.4),
                 ),
                 const SizedBox(height: 16),
@@ -747,6 +762,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     TextButton(
                       onPressed: () => _handleRestorePurchases(context),
                       child: const Text('Restore', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+                const Divider(height: 24),
+                // Rewarded Ad Option
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.emeraldPrimary,
+                          side: const BorderSide(color: AppTheme.emeraldPrimary, width: 1.5),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        icon: const Icon(Icons.card_giftcard, size: 18, color: AppTheme.goldAccent),
+                        label: const Text(
+                          'Watch Video (24h Free Ad-Free)',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        onPressed: () => _handleWatchRewardedAd(context),
+                      ),
                     ),
                   ],
                 ),
@@ -832,5 +869,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         );
       }
     }
+  }
+
+  void _handleWatchRewardedAd(BuildContext context) {
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Preparing Rewarded Ad... Please wait.')),
+    );
+
+    AdService.instance.showRewardedAd(
+      onUserEarnedReward: (reward) async {
+        await AdService.instance.grantRewardAdFreeHours(24);
+        if (context.mounted) {
+          setState(() {});
+          ScaffoldMessenger.of(context).clearSnackBars();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              backgroundColor: AppTheme.emeraldPrimary,
+              content: Text('🎉 Reward Earned! All ads removed for 24 hours across all settings & screens!'),
+            ),
+          );
+        }
+      },
+      onDismissed: () {
+        if (context.mounted) setState(() {});
+      },
+    );
   }
 }

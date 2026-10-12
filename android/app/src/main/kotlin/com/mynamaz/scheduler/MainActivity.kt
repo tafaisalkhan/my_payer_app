@@ -30,37 +30,7 @@ class MainActivity: FlutterActivity() {
     private var isSoundPlaying: Boolean = false
     private var audioFocusRequest: AudioFocusRequest? = null
 
-    // BroadcastReceiver to catch Power button (Screen Off) and Home/Recent/Power dialog
-    private val hardwareKeyAndScreenReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            when (intent?.action) {
-                Intent.ACTION_SCREEN_OFF,
-                Intent.ACTION_CLOSE_SYSTEM_DIALOGS -> {
-                    if (isSoundPlaying) {
-                        stopPlayingSound()
-                    }
-                }
-            }
-        }
-    }
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        val filter = IntentFilter().apply {
-            addAction(Intent.ACTION_SCREEN_OFF)
-            addAction(Intent.ACTION_CLOSE_SYSTEM_DIALOGS)
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(hardwareKeyAndScreenReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
-        } else {
-            registerReceiver(hardwareKeyAndScreenReceiver, filter)
-        }
-    }
-
     override fun onDestroy() {
-        try {
-            unregisterReceiver(hardwareKeyAndScreenReceiver)
-        } catch (_: Exception) {}
         abandonExclusiveAudioFocus()
         super.onDestroy()
     }
@@ -115,20 +85,19 @@ class MainActivity: FlutterActivity() {
             audioManager.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_PAUSE))
         } catch (_: Exception) {}
 
-        // 2. Request exclusive Audio Focus on USAGE_MEDIA so media playback apps pause
+        // 2. Request exclusive Audio Focus on USAGE_ALARM so other app notifications do not pause or stop Azan
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val audioAttributes = AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_MEDIA)
-                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                .setUsage(AudioAttributes.USAGE_ALARM)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .build()
-            val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+            val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
                 .setAudioAttributes(audioAttributes)
                 .setAcceptsDelayedFocusGain(false)
-                .setWillPauseWhenDucked(true)
-                .setOnAudioFocusChangeListener { focusChange ->
-                    if (focusChange == AudioManager.AUDIOFOCUS_LOSS) {
-                        stopPlayingSound()
-                    }
+                .setWillPauseWhenDucked(false) // Never duck or pause for incoming notifications from other apps
+                .setOnAudioFocusChangeListener { _ ->
+                    // Do NOT stop Azan for other app notifications or transient focus losses.
+                    // Azan must ONLY stop when the user explicitly stops it.
                 }
                 .build()
             audioFocusRequest = request
@@ -136,13 +105,9 @@ class MainActivity: FlutterActivity() {
         } else {
             @Suppress("DEPRECATION")
             audioManager.requestAudioFocus(
-                { focusChange ->
-                    if (focusChange == AudioManager.AUDIOFOCUS_LOSS) {
-                        stopPlayingSound()
-                    }
-                },
-                AudioManager.STREAM_MUSIC,
-                AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
+                { /* Do not stop for other app notifications */ },
+                AudioManager.STREAM_ALARM,
+                AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE
             ) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
         }
     }

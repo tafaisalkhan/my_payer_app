@@ -49,17 +49,6 @@ class PrayerAlarmService : Service() {
     private var previousMusicVolume: Int = -1
     private var isCleanedUp: Boolean = false
 
-    private val screenOffReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            when (intent?.action) {
-                Intent.ACTION_SCREEN_OFF,
-                Intent.ACTION_CLOSE_SYSTEM_DIALOGS -> {
-                    stopSelfCleanly()
-                }
-            }
-        }
-    }
-
     private var autoSilenceTimer: Handler? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -93,7 +82,6 @@ class PrayerAlarmService : Service() {
         requestExclusiveAudioFocus()
         boostDeviceVolume()
         playEventAudio(soundType)
-        registerHardwareListeners()
     }
 
     private fun acquireWakeLock() {
@@ -104,7 +92,7 @@ class PrayerAlarmService : Service() {
                 "MyNamaz:PrayerAlarmWakeLock"
             ).apply {
                 setReferenceCounted(false)
-                acquire(180000L) // 3 minutes safety timeout
+                acquire(600000L) // 10 minutes safety timeout for full Adhan
             }
         } catch (_: Exception) {}
     }
@@ -185,20 +173,19 @@ class PrayerAlarmService : Service() {
             audioManager.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_PAUSE))
         } catch (_: Exception) {}
 
-        // 2. Request exclusive Audio Focus on USAGE_MEDIA so media playback apps pause
+        // 2. Request exclusive Audio Focus on USAGE_ALARM so other app notifications do not pause or stop Azan
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val audioAttributes = AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_MEDIA)
-                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                .setUsage(AudioAttributes.USAGE_ALARM)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .build()
-            val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+            val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
                 .setAudioAttributes(audioAttributes)
                 .setAcceptsDelayedFocusGain(false)
-                .setWillPauseWhenDucked(true)
-                .setOnAudioFocusChangeListener { focusChange ->
-                    if (focusChange == AudioManager.AUDIOFOCUS_LOSS) {
-                        stopSelfCleanly()
-                    }
+                .setWillPauseWhenDucked(false) // NEVER duck or pause for incoming notifications from other apps
+                .setOnAudioFocusChangeListener { _ ->
+                    // Do NOT stop Azan for other app notifications or transient focus losses.
+                    // Azan must ONLY stop when the user explicitly stops it.
                 }
                 .build()
             audioFocusRequest = request
@@ -206,13 +193,9 @@ class PrayerAlarmService : Service() {
         } else {
             @Suppress("DEPRECATION")
             audioManager.requestAudioFocus(
-                { focusChange ->
-                    if (focusChange == AudioManager.AUDIOFOCUS_LOSS) {
-                        stopSelfCleanly()
-                    }
-                },
-                AudioManager.STREAM_MUSIC,
-                AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
+                { /* Do not stop for other app notifications */ },
+                AudioManager.STREAM_ALARM,
+                AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE
             )
         }
     }
@@ -340,6 +323,7 @@ class PrayerAlarmService : Service() {
                     stopSelfCleanly()
                     true
                 }
+                setWakeMode(applicationContext, PowerManager.PARTIAL_WAKE_LOCK)
                 start()
             }
             mediaPlayer = player
@@ -358,26 +342,6 @@ class PrayerAlarmService : Service() {
         }
     }
 
-    private fun registerHardwareListeners() {
-        try {
-            val filter = IntentFilter().apply {
-                addAction(Intent.ACTION_SCREEN_OFF)
-                addAction(Intent.ACTION_CLOSE_SYSTEM_DIALOGS)
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                registerReceiver(screenOffReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
-            } else {
-                registerReceiver(screenOffReceiver, filter)
-            }
-        } catch (_: Exception) {}
-    }
-
-    private fun unregisterHardwareListeners() {
-        try {
-            unregisterReceiver(screenOffReceiver)
-        } catch (_: Exception) {}
-    }
-
     private fun stopSelfCleanly() {
         if (isCleanedUp) return
         isCleanedUp = true
@@ -387,8 +351,6 @@ class PrayerAlarmService : Service() {
             autoSilenceTimer?.removeCallbacksAndMessages(null)
             autoSilenceTimer = null
         } catch (_: Exception) {}
-
-        unregisterHardwareListeners()
 
         try {
             mediaPlayer?.let {

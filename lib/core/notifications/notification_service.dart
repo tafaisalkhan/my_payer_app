@@ -78,21 +78,6 @@ class NotificationService {
       },
     );
 
-    ServicesBinding.instance.defaultBinaryMessenger.setMessageHandler('flutter/keyevent', (ByteData? message) async {
-      if (isAdhanPlaying) {
-        stopAdhanPreview();
-      }
-      return null;
-    });
-
-    HardwareKeyboard.instance.addHandler((KeyEvent event) {
-      if (isAdhanPlaying) {
-        stopAdhanPreview();
-        return true;
-      }
-      return false;
-    });
-
     if (Platform.isAndroid) {
       final androidImplementation = _notifications
           .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();

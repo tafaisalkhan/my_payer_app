@@ -5,6 +5,7 @@ import 'package:mynamaz_scheduler/core/notifications/notification_service.dart';
 import 'package:mynamaz_scheduler/core/theme/app_theme.dart';
 import 'package:mynamaz_scheduler/features/prayer/presentation/providers/prayer_providers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:mynamaz_scheduler/shared/widgets/banner_ad_widget.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
@@ -77,6 +78,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           ),
         ),
       ),
+      bottomNavigationBar: const BannerAdWidget(),
     );
   }
 

@@ -8,6 +8,7 @@ import 'package:mynamaz_scheduler/features/prayer/presentation/screens/namaz_tra
 import 'package:mynamaz_scheduler/features/qibla/presentation/screens/qibla_compass_screen.dart';
 import 'package:mynamaz_scheduler/features/quran/presentation/screens/quran_scheduler_screen.dart';
 import 'package:mynamaz_scheduler/features/tasks/presentation/screens/task_scheduler_screen.dart';
+import 'package:mynamaz_scheduler/core/ads/ad_service.dart';
 import 'package:mynamaz_scheduler/shared/widgets/banner_ad_widget.dart';
 
 final currentTabProvider = StateProvider<int>((ref) => 0);
@@ -52,14 +53,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
   Widget build(BuildContext context) {
     final currentIndex = ref.watch(currentTabProvider);
 
-    return Listener(
-      behavior: HitTestBehavior.translucent,
-      onPointerDown: (_) {
-        if (NotificationService.instance.isAdhanPlaying) {
-          NotificationService.instance.stopAdhanPreview();
-        }
-      },
-      child: Scaffold(
+    return Scaffold(
         body: Stack(
           children: [
             IndexedStack(
@@ -102,7 +96,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
                                 ),
                                 SizedBox(height: 2),
                                 Text(
-                                  'Press Power / Volume / any key or tap to stop',
+                                  'Tap STOP button to silence',
                                   style: TextStyle(
                                     color: Colors.white70,
                                     fontSize: 11,
@@ -145,7 +139,10 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
             NavigationBar(
               selectedIndex: currentIndex,
               onDestinationSelected: (index) {
-                ref.read(currentTabProvider.notifier).state = index;
+                if (currentIndex != index) {
+                  ref.read(currentTabProvider.notifier).state = index;
+                  AdService.instance.registerNavigationAndMaybeShowInterstitial();
+                }
               },
               indicatorColor: AppTheme.emeraldPrimary.withValues(alpha: 0.15),
               destinations: const [
@@ -178,7 +175,6 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
             ),
           ],
         ),
-      ),
-    );
+      );
   }
 }
