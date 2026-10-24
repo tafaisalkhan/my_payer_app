@@ -16,7 +16,13 @@ if (keystorePropertiesFile.exists()) {
 android {
     namespace = "com.mynamaz.scheduler"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    ndkVersion = "28.2.13676358"
+
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
 
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
@@ -44,6 +50,7 @@ android {
 
     buildTypes {
         release {
+            proguardFiles("proguard-rules.pro")
             signingConfig = if (keystorePropertiesFile.exists()) {
                 signingConfigs.getByName("release")
             } else {

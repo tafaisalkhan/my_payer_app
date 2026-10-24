@@ -367,80 +367,84 @@ class MainActivity: FlutterActivity() {
 
     private fun createSystemAlarmChannels() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            val alarmUri: Uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-                ?: Settings.System.DEFAULT_ALARM_ALERT_URI
-
-            val audioAttributes = AudioAttributes.Builder()
-                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                .setUsage(AudioAttributes.USAGE_ALARM)
-                .build()
-
-            // Clean up older v4 channels
             try {
-                notificationManager.deleteNotificationChannel("namaz_prayer_channel_v4")
-                notificationManager.deleteNotificationChannel("quran_recitation_channel_v4")
-                notificationManager.deleteNotificationChannel("work_task_channel_v4")
-            } catch (_: Exception) {}
+                val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                val alarmUri: Uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                    ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                    ?: Settings.System.DEFAULT_ALARM_ALERT_URI
 
-            // 1. Quran Recitation Alarm Channel (Using Device's Default Clock Alarm)
-            val quranChannel = NotificationChannel(
-                "quran_recitation_channel_v5",
-                "Quran Recitation Alarms",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Device clock alarm for scheduled Quran recitation"
-                setSound(alarmUri, audioAttributes)
-                enableVibration(true)
-                setBypassDnd(true)
-                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-                vibrationPattern = longArrayOf(0, 500, 200, 500)
+                val audioAttributes = AudioAttributes.Builder()
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .build()
+
+                // Clean up older v4 channels
+                try {
+                    notificationManager.deleteNotificationChannel("namaz_prayer_channel_v4")
+                    notificationManager.deleteNotificationChannel("quran_recitation_channel_v4")
+                    notificationManager.deleteNotificationChannel("work_task_channel_v4")
+                } catch (_: Exception) {}
+
+                // 1. Quran Recitation Alarm Channel (Using Device's Default Clock Alarm)
+                val quranChannel = NotificationChannel(
+                    "quran_recitation_channel_v5",
+                    "Quran Recitation Alarms",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "Device clock alarm for scheduled Quran recitation"
+                    setSound(alarmUri, audioAttributes)
+                    enableVibration(true)
+                    setBypassDnd(true)
+                    lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+                    vibrationPattern = longArrayOf(0, 500, 200, 500)
+                }
+
+                // 2. Work Task Alarm Channel (Using Device's Default Clock Alarm)
+                val taskChannel = NotificationChannel(
+                    "work_task_channel_v5",
+                    "Work Task Alarms",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "Device clock alarm for scheduled work tasks"
+                    setSound(alarmUri, audioAttributes)
+                    enableVibration(true)
+                    setBypassDnd(true)
+                    lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+                    vibrationPattern = longArrayOf(0, 500, 200, 500)
+                }
+
+                // 3. Namaz Prayer Adhan Channel (Using Azan Voice)
+                val resId = resources.getIdentifier("short_adhan", "raw", packageName)
+                val adhanUri: Uri = if (resId != 0) {
+                    Uri.parse("android.resource://$packageName/$resId")
+                } else {
+                    Uri.parse("android.resource://$packageName/raw/short_adhan")
+                }
+
+                val adhanAudioAttributes = AudioAttributes.Builder()
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .build()
+
+                val namazChannel = NotificationChannel(
+                    "namaz_prayer_channel_v5",
+                    "Namaz Prayer Adhan Alarms",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "Time-sensitive Adhan voice alarms for 5 daily prayer times"
+                    setSound(adhanUri, adhanAudioAttributes)
+                    enableVibration(true)
+                    setBypassDnd(true)
+                    lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+                    vibrationPattern = longArrayOf(0, 500, 200, 500)
+                }
+
+                notificationManager.createNotificationChannel(namazChannel)
+                notificationManager.createNotificationChannel(quranChannel)
+                notificationManager.createNotificationChannel(taskChannel)
+            } catch (e: Exception) {
+                android.util.Log.e("MainActivity", "Failed to createSystemAlarmChannels: ${e.message}")
             }
-
-            // 2. Work Task Alarm Channel (Using Device's Default Clock Alarm)
-            val taskChannel = NotificationChannel(
-                "work_task_channel_v5",
-                "Work Task Alarms",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Device clock alarm for scheduled work tasks"
-                setSound(alarmUri, audioAttributes)
-                enableVibration(true)
-                setBypassDnd(true)
-                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-                vibrationPattern = longArrayOf(0, 500, 200, 500)
-            }
-
-            // 3. Namaz Prayer Adhan Channel (Using Azan Voice)
-            val resId = resources.getIdentifier("short_adhan", "raw", packageName)
-            val adhanUri: Uri = if (resId != 0) {
-                Uri.parse("android.resource://$packageName/$resId")
-            } else {
-                Uri.parse("android.resource://$packageName/raw/short_adhan")
-            }
-
-            val adhanAudioAttributes = AudioAttributes.Builder()
-                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                .setUsage(AudioAttributes.USAGE_ALARM)
-                .build()
-
-            val namazChannel = NotificationChannel(
-                "namaz_prayer_channel_v5",
-                "Namaz Prayer Adhan Alarms",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Time-sensitive Adhan voice alarms for 5 daily prayer times"
-                setSound(adhanUri, adhanAudioAttributes)
-                enableVibration(true)
-                setBypassDnd(true)
-                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-                vibrationPattern = longArrayOf(0, 500, 200, 500)
-            }
-
-            notificationManager.createNotificationChannel(namazChannel)
-            notificationManager.createNotificationChannel(quranChannel)
-            notificationManager.createNotificationChannel(taskChannel)
         }
     }
 }

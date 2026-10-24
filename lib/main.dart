@@ -6,18 +6,77 @@ import 'package:mynamaz_scheduler/core/notifications/notification_service.dart';
 import 'package:mynamaz_scheduler/core/routing/app_router.dart';
 import 'package:mynamaz_scheduler/core/theme/app_theme.dart';
 import 'package:mynamaz_scheduler/features/settings/presentation/screens/settings_screen.dart';
+import 'package:mynamaz_scheduler/features/onboarding/presentation/screens/splash_screen.dart';
+import 'package:flutter/foundation.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize notifications & timezone
-  await NotificationService.instance.initialize();
+  // Global Flutter framework error handling
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+    debugPrint('Global FlutterError: ${details.exceptionAsString()}');
+  };
 
-  // Initialize Google Mobile Ads SDK
-  await AdService.instance.initialize();
+  // Global platform/asynchronous error handling (prevents OS termination)
+  PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
+    debugPrint('Global PlatformDispatcher unhandled error caught: $error');
+    return true; // Return true to mark error as handled and avoid crashing process
+  };
 
-  // Create router instance with onboarding check
-  final router = await AppRouter.createRouter();
+  // Graceful Widget Rendering Error fallback
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    return Material(
+      color: Colors.transparent,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.refresh_rounded, size: 36, color: AppTheme.emeraldPrimary),
+              const SizedBox(height: 8),
+              Text(
+                'Loading...',
+                style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  };
+
+  // Safe initialize notifications & timezone
+  try {
+    await NotificationService.instance.initialize();
+  } catch (e) {
+    debugPrint('Main: NotificationService init error: $e');
+  }
+
+  // Safe initialize Google Mobile Ads SDK
+  try {
+    await AdService.instance.initialize();
+  } catch (e) {
+    debugPrint('Main: AdService init error: $e');
+  }
+
+  // Create router instance with onboarding check (with fallback)
+  GoRouter router;
+  try {
+    router = await AppRouter.createRouter();
+  } catch (e) {
+    debugPrint('Main: Router creation error: $e');
+    router = GoRouter(
+      initialLocation: '/splash',
+      routes: [
+        GoRoute(
+          path: '/splash',
+          builder: (context, state) => const SplashScreen(),
+        ),
+      ],
+    );
+  }
 
   runApp(
     ProviderScope(

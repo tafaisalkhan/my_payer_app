@@ -18,25 +18,35 @@ class PrayerAlarmReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
-        when (action) {
-            ACTION_PRAYER_ALARM -> {
-                val serviceIntent = Intent(context, PrayerAlarmService::class.java).apply {
-                    setAction(ACTION_PRAYER_ALARM)
-                    putExtras(intent)
+        try {
+            when (action) {
+                ACTION_PRAYER_ALARM -> {
+                    val serviceIntent = Intent(context, PrayerAlarmService::class.java).apply {
+                        setAction(ACTION_PRAYER_ALARM)
+                        putExtras(intent)
+                    }
+                    try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            context.startForegroundService(serviceIntent)
+                        } else {
+                            context.startService(serviceIntent)
+                        }
+                    } catch (e: Exception) {
+                        // On Android 12+ (ForegroundServiceStartNotAllowedException) or background restrictions,
+                        // fallback safely without crashing the process
+                        android.util.Log.e("PrayerAlarmReceiver", "Could not start alarm service: ${e.message}")
+                    }
                 }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    context.startForegroundService(serviceIntent)
-                } else {
-                    context.startService(serviceIntent)
+                ACTION_STOP_ALARM -> {
+                    PrayerAlarmService.stopAlarm(context)
+                }
+                Intent.ACTION_BOOT_COMPLETED,
+                Intent.ACTION_MY_PACKAGE_REPLACED -> {
+                    // Handled gracefully when app is launched or rescheduled
                 }
             }
-            ACTION_STOP_ALARM -> {
-                PrayerAlarmService.stopAlarm(context)
-            }
-            Intent.ACTION_BOOT_COMPLETED,
-            Intent.ACTION_MY_PACKAGE_REPLACED -> {
-                // Handled when app is launched or rescheduled
-            }
+        } catch (e: Exception) {
+            android.util.Log.e("PrayerAlarmReceiver", "Exception in onReceive: ${e.message}")
         }
     }
 }

@@ -35,10 +35,14 @@ class PrayerAlarmService : Service() {
             private set
 
         fun stopAlarm(context: Context) {
-            val stopIntent = Intent(context, PrayerAlarmService::class.java).apply {
-                action = PrayerAlarmReceiver.ACTION_STOP_ALARM
+            try {
+                val stopIntent = Intent(context, PrayerAlarmService::class.java).apply {
+                    action = PrayerAlarmReceiver.ACTION_STOP_ALARM
+                }
+                context.startService(stopIntent)
+            } catch (e: Exception) {
+                android.util.Log.e("PrayerAlarmService", "Failed to stopAlarm: ${e.message}")
             }
-            context.startService(stopIntent)
         }
     }
 
@@ -157,10 +161,14 @@ class PrayerAlarmService : Service() {
             .addAction(android.R.drawable.ic_media_pause, buttonText, stopPendingIntent)
             .build()
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("PrayerAlarmService", "Failed to startForeground: ${e.message}")
         }
     }
 

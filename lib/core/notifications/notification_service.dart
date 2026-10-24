@@ -55,77 +55,105 @@ class NotificationService {
   Future<void> initialize() async {
     if (_isInitialized) return;
 
-    tz.initializeTimeZones();
+    try {
+      tz.initializeTimeZones();
+    } catch (e) {
+      debugPrint('NotificationService: timezone init error: $e');
+    }
 
-    const AndroidInitializationSettings androidSettings =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+    try {
+      const AndroidInitializationSettings androidSettings =
+          AndroidInitializationSettings('@mipmap/ic_launcher');
 
-    const DarwinInitializationSettings iosSettings = DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
-    );
+      const DarwinInitializationSettings iosSettings = DarwinInitializationSettings(
+        requestAlertPermission: true,
+        requestBadgePermission: true,
+        requestSoundPermission: true,
+      );
 
-    const InitializationSettings settings = InitializationSettings(
-      android: androidSettings,
-      iOS: iosSettings,
-    );
+      const InitializationSettings settings = InitializationSettings(
+        android: androidSettings,
+        iOS: iosSettings,
+      );
 
-    await _notifications.initialize(
-      settings,
-      onDidReceiveNotificationResponse: (NotificationResponse response) {
-        // Handle notification click action
-      },
-    );
+      await _notifications.initialize(
+        settings,
+        onDidReceiveNotificationResponse: (NotificationResponse response) {
+          // Handle notification click action
+        },
+      );
+    } catch (e) {
+      debugPrint('NotificationService: _notifications.initialize error: $e');
+    }
 
     if (Platform.isAndroid) {
-      final androidImplementation = _notifications
-          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+      try {
+        final androidImplementation = _notifications
+            .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
 
-      if (androidImplementation != null) {
-        await androidImplementation.createNotificationChannel(
-          const AndroidNotificationChannel(
-            AppConstants.namazChannelId,
-            AppConstants.namazChannelName,
-            description: 'Time-sensitive notifications for 5 daily prayer times',
-            importance: Importance.max,
-            playSound: true,
-            enableVibration: true,
-            sound: RawResourceAndroidNotificationSound('short_adhan'),
-            audioAttributesUsage: AudioAttributesUsage.alarm,
-          ),
-        );
+        if (androidImplementation != null) {
+          try {
+            await androidImplementation.createNotificationChannel(
+              const AndroidNotificationChannel(
+                AppConstants.namazChannelId,
+                AppConstants.namazChannelName,
+                description: 'Time-sensitive notifications for 5 daily prayer times',
+                importance: Importance.max,
+                playSound: true,
+                enableVibration: true,
+                sound: RawResourceAndroidNotificationSound('short_adhan'),
+                audioAttributesUsage: AudioAttributesUsage.alarm,
+              ),
+            );
+          } catch (e) {
+            debugPrint('Error creating namaz channel: $e');
+          }
 
-        final alarmUri = await getSystemAlarmUri();
-        final alarmSound = (alarmUri != null && alarmUri.isNotEmpty)
-            ? UriAndroidNotificationSound(alarmUri)
-            : null;
+          String? alarmUri;
+          try {
+            alarmUri = await getSystemAlarmUri();
+          } catch (_) {}
 
-        await androidImplementation.createNotificationChannel(
-          AndroidNotificationChannel(
-            AppConstants.quranChannelId,
-            AppConstants.quranChannelName,
-            description: 'Scheduled Quran recitation reminders and alarms',
-            importance: Importance.max,
-            playSound: true,
-            enableVibration: true,
-            sound: alarmSound,
-            audioAttributesUsage: AudioAttributesUsage.alarm,
-          ),
-        );
+          final alarmSound = (alarmUri != null && alarmUri.isNotEmpty)
+              ? UriAndroidNotificationSound(alarmUri)
+              : null;
 
-        await androidImplementation.createNotificationChannel(
-          AndroidNotificationChannel(
-            AppConstants.taskChannelId,
-            AppConstants.taskChannelName,
-            description: 'Scheduled work task activity reminders and alarms',
-            importance: Importance.max,
-            playSound: true,
-            enableVibration: true,
-            sound: alarmSound,
-            audioAttributesUsage: AudioAttributesUsage.alarm,
-          ),
-        );
+          try {
+            await androidImplementation.createNotificationChannel(
+              AndroidNotificationChannel(
+                AppConstants.quranChannelId,
+                AppConstants.quranChannelName,
+                description: 'Scheduled Quran recitation reminders and alarms',
+                importance: Importance.max,
+                playSound: true,
+                enableVibration: true,
+                sound: alarmSound,
+                audioAttributesUsage: AudioAttributesUsage.alarm,
+              ),
+            );
+          } catch (e) {
+            debugPrint('Error creating quran channel: $e');
+          }
+
+          try {
+            await androidImplementation.createNotificationChannel(
+              AndroidNotificationChannel(
+                AppConstants.taskChannelId,
+                AppConstants.taskChannelName,
+                description: 'Scheduled work task activity reminders and alarms',
+                importance: Importance.max,
+                playSound: true,
+                enableVibration: true,
+                sound: alarmSound,
+                audioAttributesUsage: AudioAttributesUsage.alarm,
+              ),
+            );
+          } catch (e) {
+            debugPrint('Error creating task channel: $e');
+          }
+        }
+      } catch (e) {
+        debugPrint('NotificationService: channel creation error: $e');
       }
     }
 

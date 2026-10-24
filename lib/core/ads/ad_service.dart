@@ -68,10 +68,19 @@ class AdService {
   }
 
   int _navigationCount = 0;
+  bool _canShowInterstitial = false;
   static const int _interstitialNavigationFrequency = 4; // Trigger on every 4 to 5 navigations
+
+  /// Enables interstitial ads only after the app has fully settled (15s after startup)
+  void enableInterstitialAfterStartup() {
+    Future.delayed(const Duration(seconds: 15), () {
+      _canShowInterstitial = true;
+    });
+  }
 
   /// Tracks screen or tab navigation and shows interstitial every 4 to 5 navigations
   void registerNavigationAndMaybeShowInterstitial() {
+    if (!_canShowInterstitial) return;
     if (isAdsRemoved) return;
     _navigationCount++;
     debugPrint('AdService: Navigation count = $_navigationCount / $_interstitialNavigationFrequency');
@@ -95,6 +104,7 @@ class AdService {
       if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
         await MobileAds.instance.initialize();
         _isInitialized = true;
+        enableInterstitialAfterStartup();
 
         if (!isAdsRemoved) {
           loadInterstitialAd();
