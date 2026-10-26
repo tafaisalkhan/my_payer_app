@@ -42,7 +42,16 @@ class PrayerAlarmReceiver : BroadcastReceiver() {
                 }
                 Intent.ACTION_BOOT_COMPLETED,
                 Intent.ACTION_MY_PACKAGE_REPLACED -> {
-                    // Handled gracefully when app is launched or rescheduled
+                    val pendingResult = goAsync()
+                    Thread {
+                        try {
+                            PersistedAlarmScheduler.restore(context.applicationContext)
+                        } catch (e: Exception) {
+                            android.util.Log.e("PrayerAlarmReceiver", "Could not restore alarms", e)
+                        } finally {
+                            pendingResult.finish()
+                        }
+                    }.start()
                 }
             }
         } catch (e: Exception) {

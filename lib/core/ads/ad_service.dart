@@ -13,6 +13,8 @@ class AdService {
   static const String _prefKeyRewardAdFreeUntil = 'reward_ad_free_until';
 
   bool _isInitialized = false;
+  final ValueNotifier<bool> isInitializedNotifier = ValueNotifier<bool>(false);
+  bool _dashboardVisible = false;
   InterstitialAd? _interstitialAd;
   bool _isInterstitialLoading = false;
 
@@ -71,8 +73,11 @@ class AdService {
   bool _canShowInterstitial = false;
   static const int _interstitialNavigationFrequency = 4; // Trigger on every 4 to 5 navigations
 
-  /// Enables interstitial ads only after the app has fully settled (15s after startup)
-  void enableInterstitialAfterStartup() {
+  /// Start loading ads after the first dashboard frame, and defer interstitials.
+  void onDashboardVisible() {
+    if (_dashboardVisible) return;
+    _dashboardVisible = true;
+    initialize();
     Future.delayed(const Duration(seconds: 15), () {
       _canShowInterstitial = true;
     });
@@ -104,7 +109,7 @@ class AdService {
       if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
         await MobileAds.instance.initialize();
         _isInitialized = true;
-        enableInterstitialAfterStartup();
+        isInitializedNotifier.value = true;
 
         if (!isAdsRemoved) {
           loadInterstitialAd();
@@ -173,7 +178,7 @@ class AdService {
     required Function(Ad, LoadAdError) onAdFailedToLoad,
     AdSize size = AdSize.banner,
   }) {
-    if (isAdsRemoved) return null;
+    if (!_dashboardVisible || !_isInitialized || isAdsRemoved) return null;
 
     return BannerAd(
       adUnitId: bannerAdUnitId,
@@ -190,7 +195,7 @@ class AdService {
 
   /// 2. INTERSTITIAL AD
   void loadInterstitialAd() {
-    if (isAdsRemoved) return;
+    if (!_dashboardVisible || !_isInitialized || isAdsRemoved) return;
     if (_isInterstitialLoading || _interstitialAd != null) return;
     _isInterstitialLoading = true;
 
@@ -213,7 +218,7 @@ class AdService {
   }
 
   void showInterstitialAd({VoidCallback? onDismissed}) {
-    if (isAdsRemoved) {
+    if (!_dashboardVisible || !_isInitialized || isAdsRemoved) {
       onDismissed?.call();
       return;
     }

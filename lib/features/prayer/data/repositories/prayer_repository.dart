@@ -2,6 +2,7 @@ import 'package:adhan/adhan.dart';
 import 'package:mynamaz_scheduler/core/database/app_database.dart';
 import 'package:mynamaz_scheduler/features/prayer/domain/models/prayer_record.dart';
 import 'package:mynamaz_scheduler/features/prayer/domain/models/prayer_timing.dart';
+import 'package:mynamaz_scheduler/features/prayer/domain/models/voluntary_prayer_timing.dart';
 import 'package:sqflite/sqflite.dart';
 
 class PrayerCalculationSettings {
@@ -25,6 +26,57 @@ class PrayerCalculationSettings {
 }
 
 class PrayerRepository {
+  /// Suggested voluntary prayer times. These are display only and never enter
+  /// the five-prayer adhan alarm list.
+  List<VoluntaryPrayerTiming> calculateVoluntaryPrayerTimings({
+    required double latitude,
+    required double longitude,
+    required DateTime date,
+    required PrayerCalculationSettings settings,
+  }) {
+    final coordinates = Coordinates(latitude, longitude);
+    final params = _getAdhanMethodParameters(settings.method);
+    params.madhab = settings.madhab.toUpperCase() == 'HANAFI'
+        ? Madhab.hanafi
+        : Madhab.shafi;
+
+    PrayerTimes forDate(DateTime day) =>
+        PrayerTimes(coordinates, DateComponents.from(day), params);
+
+    final today = forDate(date);
+    final yesterday = forDate(DateTime(date.year, date.month, date.day - 1));
+    final sunrise = today.sunrise;
+    final dhuhr = today.dhuhr.add(Duration(minutes: settings.dhuhrOffset));
+    final maghrib = today.maghrib.add(Duration(minutes: settings.maghribOffset));
+    final fajr = today.fajr.add(Duration(minutes: settings.fajrOffset));
+    final previousMaghrib = yesterday.maghrib.add(Duration(minutes: settings.maghribOffset));
+    final night = fajr.difference(previousMaghrib);
+
+    return [
+      VoluntaryPrayerTiming(
+        name: 'Tahajjud',
+        time: fajr.subtract(Duration(microseconds: night.inMicroseconds ~/ 3)),
+        description: 'Last third of the night, before Fajr',
+      ),
+      VoluntaryPrayerTiming(
+        name: 'Ishraq',
+        time: sunrise.add(const Duration(minutes: 20)),
+        description: 'About 20 minutes after sunrise',
+      ),
+      VoluntaryPrayerTiming(
+        name: 'Chasht (Duha)',
+        time: sunrise.add(Duration(microseconds:
+            dhuhr.difference(sunrise).inMicroseconds ~/ 2)),
+        description: 'Midmorning, before Dhuhr',
+      ),
+      VoluntaryPrayerTiming(
+        name: 'Awwabin',
+        time: maghrib.add(const Duration(minutes: 15)),
+        description: 'After Maghrib prayer',
+      ),
+    ];
+  }
+
   CalculationParameters _getAdhanMethodParameters(String methodStr) {
     switch (methodStr.toUpperCase()) {
       case 'MWL':
@@ -37,11 +89,15 @@ class PrayerRepository {
         return CalculationMethod.umm_al_qura.getParameters();
       case 'TEHRAN':
         return CalculationMethod.tehran.getParameters();
-      case 'JAFARI':
       case 'DUBAI':
+        return CalculationMethod.dubai.getParameters();
       case 'QATAR':
+        return CalculationMethod.qatar.getParameters();
       case 'KUWAIT':
+        return CalculationMethod.kuwait.getParameters();
       case 'SINGAPORE':
+        return CalculationMethod.singapore.getParameters();
+      case 'JAFARI':
       case 'KARACHI':
       default:
         return CalculationMethod.karachi.getParameters();

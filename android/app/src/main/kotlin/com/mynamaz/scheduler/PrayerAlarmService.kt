@@ -52,6 +52,11 @@ class PrayerAlarmService : Service() {
     private var previousAlarmVolume: Int = -1
     private var previousMusicVolume: Int = -1
     private var isCleanedUp: Boolean = false
+    private var screenOffReceiver: BroadcastReceiver? = null
+    private var volumeObserver: ContentObserver? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var volumeObserverRegistration: Runnable? = null
+    private var wasMusicPlaying = false
 
     private var autoSilenceTimer: Handler? = null
 
@@ -85,7 +90,43 @@ class PrayerAlarmService : Service() {
         showForegroundNotification(prayerName, prayerTitle, eventType)
         requestExclusiveAudioFocus()
         boostDeviceVolume()
+        listenForHardwareStop()
         playEventAudio(soundType)
+    }
+
+    private fun listenForHardwareStop() {
+        // Android reserves the power key; locking the screen is the observable signal.
+        try {
+            screenOffReceiver = object : BroadcastReceiver() {
+                override fun onReceive(context: Context, intent: Intent) {
+                    if (intent.action == Intent.ACTION_SCREEN_OFF && isRinging) stopSelfCleanly()
+                }
+            }.also { registerReceiver(it, IntentFilter(Intent.ACTION_SCREEN_OFF)) }
+        } catch (e: Exception) {
+            android.util.Log.w("PrayerAlarmService", "Screen-off listener unavailable", e)
+        }
+
+        // Volume keys do not reach MainActivity while it is in the background.
+        // Observe stream volume after our own volume boost has settled.
+        volumeObserverRegistration = Runnable {
+            if (!isRinging) return@Runnable
+            try {
+                val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                val alarmVolume = audioManager.getStreamVolume(AudioManager.STREAM_ALARM)
+                val musicVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                volumeObserver = object : ContentObserver(mainHandler) {
+                    override fun onChange(selfChange: Boolean) {
+                        if (!isRinging) return
+                        if (audioManager.getStreamVolume(AudioManager.STREAM_ALARM) != alarmVolume ||
+                            audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) != musicVolume) {
+                            stopSelfCleanly()
+                        }
+                    }
+                }.also { contentResolver.registerContentObserver(Settings.System.CONTENT_URI, true, it) }
+            } catch (e: Exception) {
+                android.util.Log.w("PrayerAlarmService", "Volume listener unavailable", e)
+            }
+        }.also { mainHandler.postDelayed(it, 500L) }
     }
 
     private fun acquireWakeLock() {
@@ -174,6 +215,7 @@ class PrayerAlarmService : Service() {
 
     private fun requestExclusiveAudioFocus() {
         val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        wasMusicPlaying = audioManager.isMusicActive
 
         // 1. Dispatch media pause key event to pause YouTube, Spotify, and other running media players immediately
         try {
@@ -222,6 +264,8 @@ class PrayerAlarmService : Service() {
     }
 
     private fun resumePreviousMedia() {
+        if (!wasMusicPlaying) return
+        wasMusicPlaying = false
         try {
             val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
             // Dispatch media play key event so previous media player (YouTube, Spotify, etc.) automatically resumes
@@ -354,6 +398,17 @@ class PrayerAlarmService : Service() {
         if (isCleanedUp) return
         isCleanedUp = true
         isRinging = false
+
+        volumeObserverRegistration?.let { mainHandler.removeCallbacks(it) }
+        volumeObserverRegistration = null
+        volumeObserver?.let {
+            try { contentResolver.unregisterContentObserver(it) } catch (_: Exception) {}
+        }
+        volumeObserver = null
+        screenOffReceiver?.let {
+            try { unregisterReceiver(it) } catch (_: Exception) {}
+        }
+        screenOffReceiver = null
 
         try {
             autoSilenceTimer?.removeCallbacksAndMessages(null)

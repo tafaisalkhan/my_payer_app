@@ -17,6 +17,7 @@ class NamazTrackingScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final todayRecords = ref.watch(todayPrayerRecordsProvider);
     final timings = ref.watch(prayerTimingsProvider);
+    final voluntaryTimings = ref.watch(voluntaryPrayerTimingsProvider);
 
     final List<String> prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
 
@@ -52,6 +53,24 @@ class NamazTrackingScreen extends ConsumerWidget {
             // 1. Statistics Summary Cards
             _buildStatsOverview(totalCompleted, onTimePct, qadaCount, takbirCount),
             const SizedBox(height: 20),
+
+            if (voluntaryTimings.isNotEmpty) ...[
+              const Text('Optional Prayer Times',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              const Text('Suggested times • No adhan',
+                  style: TextStyle(fontSize: 12, color: Colors.grey)),
+              const SizedBox(height: 8),
+              for (final timing in voluntaryTimings)
+                Card(
+                  child: ListTile(
+                    title: Text(timing.name),
+                    subtitle: Text(timing.description),
+                    trailing: Text(DateFormatter.formatTime(timing.time)),
+                  ),
+                ),
+              const SizedBox(height: 20),
+            ],
 
             // 2. Today's Prayer Tracking Section
             Row(
@@ -134,7 +153,7 @@ class NamazTrackingScreen extends ConsumerWidget {
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w500,
-                                    color: isTimeStarted ? Colors.grey.shade700 : Colors.orange.shade800,
+                                    color: isTimeStarted ? Theme.of(context).colorScheme.onSurfaceVariant : Colors.orange.shade800,
                                   ),
                                 ),
                               ],
@@ -176,7 +195,7 @@ class NamazTrackingScreen extends ConsumerWidget {
                           spacing: 8,
                           children: [
                             ChoiceChip(
-                              avatar: !isTimeStarted ? Icon(Icons.lock, size: 14, color: Colors.grey.shade600) : null,
+                              avatar: !isTimeStarted ? Icon(Icons.lock, size: 14, color: Theme.of(context).colorScheme.onSurfaceVariant) : null,
                               label: Text(isTimeStarted ? 'On Time' : 'Locked'),
                               selected: currentStatus == PrayerStatus.onTime,
                               selectedColor: Colors.green.shade100,
@@ -271,105 +290,9 @@ class NamazTrackingScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 16),
 
-            // 3. Rewarded Ad Feature Card
-            _buildRewardedAdCard(context),
-            const SizedBox(height: 12),
-
-            // 4. In-Screen Banner Ad
+            // In-Screen Banner Ad
             const BannerAdWidget(),
             const SizedBox(height: 24),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRewardedAdCard(BuildContext context) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          gradient: LinearGradient(
-            colors: [
-              AppTheme.emeraldPrimary.withValues(alpha: 0.05),
-              AppTheme.goldAccent.withValues(alpha: 0.12),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          border: Border.all(
-            color: AppTheme.goldAccent.withValues(alpha: 0.3),
-            width: 1,
-          ),
-        ),
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: AppTheme.goldAccent.withValues(alpha: 0.15),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.card_giftcard, color: AppTheme.goldAccent, size: 24),
-                ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '🎁 Support App & Earn Blessing Points',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                      ),
-                      SizedBox(height: 2),
-                      Text(
-                        'Watch a short rewarded video ad to earn rewards and support free Islamic app features.',
-                        style: TextStyle(fontSize: 12, color: Colors.black87),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.emeraldPrimary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-                icon: const Icon(Icons.play_circle_fill, size: 20, color: AppTheme.goldLight),
-                label: const Text(
-                  'Watch Rewarded Ad',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                onPressed: () {
-                  AdService.instance.showRewardedAd(
-                    onUserEarnedReward: (reward) {
-                      ScaffoldMessenger.of(context).clearSnackBars();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('🎉 JazakAllah Khair! You earned ${reward.amount.toInt()} blessing points.'),
-                          backgroundColor: AppTheme.emeraldPrimary,
-                          duration: const Duration(seconds: 4),
-                        ),
-                      );
-                    },
-                    onDismissed: () {
-                      debugPrint('Rewarded ad closed.');
-                    },
-                  );
-                },
-              ),
-            ),
           ],
         ),
       ),
@@ -401,7 +324,7 @@ class NamazTrackingScreen extends ConsumerWidget {
       children: [
         Text(val, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
         const SizedBox(height: 2),
-        Text(title, style: TextStyle(fontSize: 11, color: Colors.grey.shade700)),
+        Text(title, style: const TextStyle(fontSize: 11, color: Colors.grey)),
       ],
     );
   }

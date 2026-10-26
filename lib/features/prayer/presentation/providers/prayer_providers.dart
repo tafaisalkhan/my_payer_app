@@ -6,12 +6,16 @@ import 'package:mynamaz_scheduler/core/utils/prayer_time_helper.dart';
 import 'package:mynamaz_scheduler/features/prayer/data/repositories/prayer_repository.dart';
 import 'package:mynamaz_scheduler/features/prayer/domain/models/prayer_record.dart';
 import 'package:mynamaz_scheduler/features/prayer/domain/models/prayer_timing.dart';
+import 'package:mynamaz_scheduler/features/prayer/domain/models/voluntary_prayer_timing.dart';
 import 'package:mynamaz_scheduler/features/quran/data/repositories/quran_repository.dart';
 import 'package:mynamaz_scheduler/features/tasks/data/repositories/task_repository.dart';
+import 'package:mynamaz_scheduler/features/tasks/domain/models/work_task.dart';
+import 'package:mynamaz_scheduler/features/tasks/domain/task_alarm_scheduler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 final locationServiceProvider = Provider<LocationService>((ref) => LocationService());
 final prayerRepositoryProvider = Provider<PrayerRepository>((ref) => PrayerRepository());
+bool _legacyPrayerAlarmsCleared = false;
 
 final locationDataProvider = FutureProvider<LocationData>((ref) async {
   final service = ref.watch(locationServiceProvider);
@@ -23,8 +27,10 @@ final prayerSettingsProvider = StateNotifierProvider<PrayerSettingsNotifier, Pra
 });
 
 class PrayerSettingsNotifier extends StateNotifier<PrayerCalculationSettings> {
+  late final Future<void> _ready;
+
   PrayerSettingsNotifier() : super(const PrayerCalculationSettings()) {
-    _loadSettings();
+    _ready = _loadSettings();
   }
 
   Future<void> _loadSettings() async {
@@ -49,6 +55,7 @@ class PrayerSettingsNotifier extends StateNotifier<PrayerCalculationSettings> {
   }
 
   Future<void> updateMethod(String newMethod) async {
+    await _ready;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('pref_calc_method', newMethod);
     state = PrayerCalculationSettings(
@@ -63,6 +70,7 @@ class PrayerSettingsNotifier extends StateNotifier<PrayerCalculationSettings> {
   }
 
   Future<void> updateMadhab(String newMadhab) async {
+    await _ready;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('pref_madhab', newMadhab);
     state = PrayerCalculationSettings(
@@ -83,6 +91,7 @@ class PrayerSettingsNotifier extends StateNotifier<PrayerCalculationSettings> {
     int? maghrib,
     int? isha,
   }) async {
+    await _ready;
     final prefs = await SharedPreferences.getInstance();
     if (fajr != null) await prefs.setInt('pref_offset_fajr', fajr);
     if (dhuhr != null) await prefs.setInt('pref_offset_dhuhr', dhuhr);
@@ -110,6 +119,13 @@ final prayerTimingsProvider = Provider<List<PrayerTiming>>((ref) {
   final location = locationAsync.valueOrNull;
   if (location == null) return [];
 
+  if (!_legacyPrayerAlarmsCleared) {
+    _legacyPrayerAlarmsCleared = true;
+    NotificationService.instance.cancelNativePrayerAlarms(
+      List.generate(70, (index) => 1000 + index),
+    );
+  }
+
   final now = DateTime.now();
   final timings = repo.calculatePrayerTimings(
     latitude: location.latitude,
@@ -120,6 +136,7 @@ final prayerTimingsProvider = Provider<List<PrayerTiming>>((ref) {
 
   // Auto-schedule exact alarms for the next 7 days (both native high-priority alarm service and local notifications)
   final List<Map<String, dynamic>> nativeAlarms = [];
+  final List<int> expiredAlarmIds = [];
 
   for (int dayOffset = 0; dayOffset < 7; dayOffset++) {
     final targetDate = now.add(Duration(days: dayOffset));
@@ -132,9 +149,9 @@ final prayerTimingsProvider = Provider<List<PrayerTiming>>((ref) {
 
     for (int i = 0; i < dayTimings.length; i++) {
       final t = dayTimings[i];
+      final alarmId =
+          (targetDate.year * 10000 + targetDate.month * 100 + targetDate.day) * 10 + i;
       if (t.time.isAfter(now)) {
-        final alarmId = 1000 + (dayOffset * 10) + i;
-
         // Android AlarmManager high-priority alarm (wakes phone, halts background apps, boosts volume)
         nativeAlarms.add({
           'id': alarmId,
@@ -144,12 +161,17 @@ final prayerTimingsProvider = Provider<List<PrayerTiming>>((ref) {
           'eventType': 'AZAN',
           'soundType': 'ADHAN',
         });
+      } else {
+        expiredAlarmIds.add(alarmId);
       }
     }
   }
 
   if (nativeAlarms.isNotEmpty) {
     NotificationService.instance.scheduleNativePrayerAlarms(nativeAlarms);
+  }
+  if (expiredAlarmIds.isNotEmpty) {
+    NotificationService.instance.cancelNativePrayerAlarms(expiredAlarmIds);
   }
 
   // Auto-schedule prayer-dependent Quran schedules for the next 7 days
@@ -196,61 +218,45 @@ final prayerTimingsProvider = Provider<List<PrayerTiming>>((ref) {
     }).catchError((_) {});
   } catch (_) {}
 
-  // Auto-schedule prayer-dependent pending Work Tasks
-  try {
-    final taskRepo = TaskRepository();
-    taskRepo.getPendingTasks().then((tasks) {
-      for (final task in tasks) {
-        final parsed = PrayerTimeHelper.parseScheduleTimeString(task.startTime);
-        if (!parsed.isPrayerRelative) continue;
-
-        final taskDate = DateTime.tryParse(task.scheduledDate) ?? now;
-        final dayTimings = repo.calculatePrayerTimings(
-          latitude: location.latitude,
-          longitude: location.longitude,
-          date: taskDate,
-          settings: settings,
-        );
-        final targetStart = PrayerTimeHelper.calculateTargetTimeForDate(
-          date: taskDate,
-          isPrayerRelative: true,
-          clockTime: parsed.clockTime,
-          prayerName: parsed.prayerName,
-          referencePoint: parsed.referencePoint,
-          offsetMinutes: parsed.offsetMinutes,
-          prayerTimings: dayTimings,
-          settings: settings,
-        );
-
-        if (targetStart.isAfter(now)) {
-          final taskAlarmId = 400000 + (task.id.hashCode.abs() % 10000);
-          final periodInfo = PrayerTimeHelper.getPeriodInfo(parsed.prayerName);
-          NotificationService.instance.scheduleNativeAlarm(
-            id: taskAlarmId,
-            scheduledDate: targetStart,
-            name: '🚀 Task Start: ${task.title}',
-            title: '${periodInfo.emoji} ${periodInfo.label}: Your ${task.durationMinutes}-minute task starts now.',
-            eventType: 'TASK',
-            soundType: 'ALARM',
-          );
-
-          final targetEnd = targetStart.add(Duration(minutes: task.durationMinutes));
-          if (targetEnd.isAfter(now)) {
-            NotificationService.instance.scheduleNativeAlarm(
-              id: taskAlarmId + 1,
-              scheduledDate: targetEnd,
-              name: '⏰ Task Timeout: ${task.title}',
-              title: 'Time is up! Your ${task.durationMinutes}-minute task session has completed.',
-              eventType: 'TASK',
-              soundType: 'ALARM',
-            );
-          }
-        }
-      }
-    }).catchError((_) {});
-  } catch (_) {}
+  // Refresh saved task alarms if prayer settings or location changed.
+  TaskRepository().getPendingTasks().then((tasks) async {
+    for (final task in tasks) {
+      if (task.status == TaskStatus.inProgress) continue;
+      final taskDate = DateTime.tryParse(task.scheduledDate);
+      if (taskDate == null) continue;
+      final parsed = PrayerTimeHelper.parseScheduleTimeString(task.startTime);
+      final dayTimings = repo.calculatePrayerTimings(
+        latitude: location.latitude,
+        longitude: location.longitude,
+        date: taskDate,
+        settings: settings,
+      );
+      final start = PrayerTimeHelper.calculateTargetTimeForDate(
+        date: taskDate,
+        isPrayerRelative: parsed.isPrayerRelative,
+        clockTime: parsed.clockTime,
+        prayerName: parsed.prayerName,
+        referencePoint: parsed.referencePoint,
+        offsetMinutes: parsed.offsetMinutes,
+        prayerTimings: dayTimings,
+        settings: settings,
+      );
+      await TaskAlarmScheduler.schedule(task, start);
+    }
+  }).catchError((_) {});
 
   return timings;
+});
+
+final voluntaryPrayerTimingsProvider = Provider<List<VoluntaryPrayerTiming>>((ref) {
+  final location = ref.watch(locationDataProvider).valueOrNull;
+  if (location == null) return [];
+  return ref.watch(prayerRepositoryProvider).calculateVoluntaryPrayerTimings(
+    latitude: location.latitude,
+    longitude: location.longitude,
+    date: DateTime.now(),
+    settings: ref.watch(prayerSettingsProvider),
+  );
 });
 
 final nextPrayerProvider = Provider<PrayerTiming?>((ref) {

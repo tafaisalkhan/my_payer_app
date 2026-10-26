@@ -71,6 +71,50 @@ void main() {
       final offsetFajr = offsetTimings.firstWhere((t) => t.name == 'Fajr').time;
 
       expect(offsetFajr.difference(baseFajr).inMinutes, equals(15));
+      for (var index = 1; index < baseTimings.length; index++) {
+        expect(offsetTimings[index].time, baseTimings[index].time);
+      }
+    });
+
+    test('Regional calculation methods do not fall back to Karachi', () {
+      final date = DateTime(2026, 10, 9);
+      List<DateTime> timesFor(String method) => repository.calculatePrayerTimings(
+            latitude: 24.8607,
+            longitude: 67.0011,
+            date: date,
+            settings: PrayerCalculationSettings(method: method),
+          ).map((timing) => timing.time).toList();
+
+      final karachi = timesFor('KARACHI');
+      for (final method in ['DUBAI', 'QATAR', 'KUWAIT', 'SINGAPORE']) {
+        expect(timesFor(method), isNot(equals(karachi)), reason: method);
+      }
+    });
+
+    test('Optional times are separate from the five adhan prayers', () {
+      final date = DateTime(2026, 10, 9);
+      const settings = PrayerCalculationSettings();
+      final obligatory = repository.calculatePrayerTimings(
+        latitude: 24.8607,
+        longitude: 67.0011,
+        date: date,
+        settings: settings,
+      );
+      final optional = repository.calculateVoluntaryPrayerTimings(
+        latitude: 24.8607,
+        longitude: 67.0011,
+        date: date,
+        settings: settings,
+      );
+
+      expect(obligatory.length, 5);
+      expect(optional.map((t) => t.name),
+          ['Tahajjud', 'Ishraq', 'Chasht (Duha)', 'Awwabin']);
+      expect(optional[0].time.isBefore(obligatory[0].time), isTrue);
+      expect(optional[1].time.isBefore(optional[2].time), isTrue);
+      expect(optional[2].time.isBefore(obligatory[1].time), isTrue);
+      expect(optional[3].time.isAfter(obligatory[3].time), isTrue);
+      expect(optional[3].time.isBefore(obligatory[4].time), isTrue);
     });
 
     test('When Isha prayer has passed at night, getNextPrayer returns tomorrow Fajr with positive countdown', () {

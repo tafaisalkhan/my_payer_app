@@ -9,6 +9,7 @@ import 'package:mynamaz_scheduler/core/theme/app_theme.dart';
 import 'package:mynamaz_scheduler/core/utils/prayer_time_helper.dart';
 import 'package:mynamaz_scheduler/features/prayer/presentation/providers/prayer_providers.dart';
 import 'package:mynamaz_scheduler/features/tasks/domain/models/work_task.dart';
+import 'package:mynamaz_scheduler/features/tasks/domain/task_alarm_scheduler.dart';
 import 'package:mynamaz_scheduler/features/tasks/presentation/providers/task_providers.dart';
 
 class TaskSchedulerScreen extends ConsumerStatefulWidget {
@@ -94,8 +95,8 @@ class _TaskSchedulerScreenState extends ConsumerState<TaskSchedulerScreen> {
                         final picked = await showDatePicker(
                           context: context,
                           initialDate: selectedDate,
-                          firstDate: DateTime.now().subtract(const Duration(days: 365)),
-                          lastDate: DateTime.now().add(const Duration(days: 365)),
+                          firstDate: DateTime(2000),
+                          lastDate: DateTime(2100),
                         );
                         if (picked != null) {
                           ref.read(todayTasksProvider.notifier).loadTasks(DateFormat('yyyy-MM-dd').format(picked));
@@ -115,6 +116,24 @@ class _TaskSchedulerScreenState extends ConsumerState<TaskSchedulerScreen> {
               ),
             ),
             const SizedBox(height: 12),
+
+            CalendarDatePicker(
+              key: ValueKey(selectedDateIso),
+              initialDate: selectedDate,
+              firstDate: DateTime(2000),
+              lastDate: DateTime(2100),
+              onDateChanged: (date) => ref.read(todayTasksProvider.notifier)
+                  .loadTasks(DateFormat('yyyy-MM-dd').format(date)),
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () => ref.read(todayTasksProvider.notifier)
+                    .loadTasks(DateFormat('yyyy-MM-dd').format(DateTime.now())),
+                icon: const Icon(Icons.today),
+                label: const Text('Today'),
+              ),
+            ),
 
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -145,11 +164,11 @@ class _TaskSchedulerScreenState extends ConsumerState<TaskSchedulerScreen> {
                       children: [
                         const Icon(Icons.task_alt, size: 48, color: Colors.grey),
                         const SizedBox(height: 12),
-                        const Text('No work tasks scheduled for today.'),
+                        const Text('No work tasks scheduled for this date.'),
                         const SizedBox(height: 4),
                         Text(
                           'Add daily work activities and track active working time.',
-                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                          style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
                         ),
                       ],
                     ),
@@ -200,27 +219,27 @@ class _TaskSchedulerScreenState extends ConsumerState<TaskSchedulerScreen> {
                           ),
                           if (task.description?.isNotEmpty == true) ...[
                             const SizedBox(height: 4),
-                            Text(task.description!, style: TextStyle(color: Colors.grey.shade700, fontSize: 13)),
+                            Text(task.description!, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13)),
                           ],
                           const SizedBox(height: 8),
                           Row(
                             children: [
-                              Icon(Icons.calendar_today, size: 13, color: Colors.grey.shade600),
+                              Icon(Icons.calendar_today, size: 13, color: Theme.of(context).colorScheme.onSurfaceVariant),
                               const SizedBox(width: 4),
                               Text(
                                 task.scheduledDate,
-                                style: TextStyle(fontSize: 12, color: Colors.grey.shade800, fontWeight: FontWeight.w500),
+                                style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant, fontWeight: FontWeight.w500),
                               ),
                               const SizedBox(width: 8),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: Colors.grey.shade200,
+                                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: Text(
                                   task.status.name.toUpperCase(),
-                                  style: TextStyle(fontSize: 10, color: Colors.grey.shade700, fontWeight: FontWeight.w600),
+                                  style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600),
                                 ),
                               ),
                             ],
@@ -229,18 +248,23 @@ class _TaskSchedulerScreenState extends ConsumerState<TaskSchedulerScreen> {
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Icon(Icons.access_time, size: 13, color: Colors.grey.shade600),
+                              Icon(Icons.access_time, size: 13, color: Theme.of(context).colorScheme.onSurfaceVariant),
                               const SizedBox(width: 4),
                               Expanded(
                                 child: Text(
                                   task.endTime != null
                                       ? '${task.startTime} - ${task.endTime}'
                                       : task.startTime,
-                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade800, fontWeight: FontWeight.w500),
+                                  style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant, fontWeight: FontWeight.w500),
                                   softWrap: true,
                                 ),
                               ),
                             ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Reminder: ${task.reminderMinutes} minutes before',
+                            style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
                           ),
 
                           if (isStarted) ...[
@@ -287,8 +311,8 @@ class _TaskSchedulerScreenState extends ConsumerState<TaskSchedulerScreen> {
                                   IconButton(
                                     icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
                                     tooltip: 'Delete Task',
-                                    onPressed: () {
-                                      ref.read(todayTasksProvider.notifier).deleteTask(task.id);
+                                    onPressed: () async {
+                                      await ref.read(todayTasksProvider.notifier).deleteTask(task.id);
                                     },
                                   ),
                                 ],
@@ -302,6 +326,7 @@ class _TaskSchedulerScreenState extends ConsumerState<TaskSchedulerScreen> {
                                         onPressed: () async {
                                           final now = DateTime.now();
                                           setState(() => _activeSessions[task.id] = now);
+                                          await TaskAlarmScheduler.cancel(task.id);
                                           await ref.read(todayTasksProvider.notifier).updateTaskStatus(task.id, TaskStatus.inProgress);
 
                                           // Schedule immediate work session timeout alarm
@@ -366,7 +391,12 @@ class _TaskSchedulerScreenState extends ConsumerState<TaskSchedulerScreen> {
     final descController = TextEditingController(text: taskToEdit?.description ?? '');
     DateTime selectedDate = taskToEdit != null
         ? (DateTime.tryParse(taskToEdit.scheduledDate) ?? DateTime.now())
-        : DateTime.now();
+        : (DateTime.tryParse(ref.read(todayTasksProvider.notifier).selectedDateIso) ??
+            DateTime.now());
+    final today = DateTime.now();
+    if (taskToEdit == null && selectedDate.isBefore(DateTime(today.year, today.month, today.day))) {
+      selectedDate = DateTime(today.year, today.month, today.day);
+    }
     final parsedTime = PrayerTimeHelper.parseScheduleTimeString(taskToEdit?.startTime);
     String timeMode = parsedTime.isPrayerRelative ? 'PRAYER_RELATIVE' : 'CLOCK';
     String selectedPrayer = parsedTime.prayerName;
@@ -375,6 +405,7 @@ class _TaskSchedulerScreenState extends ConsumerState<TaskSchedulerScreen> {
     final offsetController = TextEditingController(text: '$offsetMinutes');
     TimeOfDay startTime = parsedTime.clockTime;
     int durationMinutes = taskToEdit?.durationMinutes ?? 60;
+    int reminderMinutes = taskToEdit?.reminderMinutes ?? 10;
     TaskPriority priority = taskToEdit?.priority ?? TaskPriority.medium;
 
     showDialog(
@@ -382,8 +413,16 @@ class _TaskSchedulerScreenState extends ConsumerState<TaskSchedulerScreen> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setState) {
-            final prayerTimings = ref.watch(prayerTimingsProvider);
             final prayerSettings = ref.watch(prayerSettingsProvider);
+            final location = ref.watch(locationDataProvider).valueOrNull;
+            final prayerTimings = location == null
+                ? ref.watch(prayerTimingsProvider)
+                : ref.read(prayerRepositoryProvider).calculatePrayerTimings(
+                    latitude: location.latitude,
+                    longitude: location.longitude,
+                    date: selectedDate,
+                    settings: prayerSettings,
+                  );
 
             final formattedTimeStr = PrayerTimeHelper.formatScheduleTimeString(
               isPrayerRelative: timeMode == 'PRAYER_RELATIVE',
@@ -436,8 +475,10 @@ class _TaskSchedulerScreenState extends ConsumerState<TaskSchedulerScreen> {
                           final picked = await showDatePicker(
                             context: context,
                             initialDate: selectedDate,
-                            firstDate: DateTime.now().subtract(const Duration(days: 1)),
-                            lastDate: DateTime.now().add(const Duration(days: 365)),
+                            firstDate: taskToEdit == null
+                                ? DateTime(today.year, today.month, today.day)
+                                : DateTime(2000),
+                            lastDate: DateTime(2100),
                           );
                           if (picked != null) {
                             setState(() => selectedDate = picked);
@@ -671,6 +712,24 @@ class _TaskSchedulerScreenState extends ConsumerState<TaskSchedulerScreen> {
                     }),
                     const SizedBox(height: 12),
 
+                    DropdownButtonFormField<int>(
+                      initialValue: reminderMinutes,
+                      decoration: const InputDecoration(
+                        labelText: 'Reminder before task',
+                        prefixIcon: Icon(Icons.notifications_active_outlined),
+                      ),
+                      items: const [5, 10, 15]
+                          .map((minutes) => DropdownMenuItem(
+                                value: minutes,
+                                child: Text('$minutes minutes before'),
+                              ))
+                          .toList(),
+                      onChanged: (value) {
+                        if (value != null) setState(() => reminderMinutes = value);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+
                     // Priority
                     DropdownButtonFormField<TaskPriority>(
                       value: priority,
@@ -715,7 +774,8 @@ class _TaskSchedulerScreenState extends ConsumerState<TaskSchedulerScreen> {
 
                     final scheduledDateIso = DateFormat('yyyy-MM-dd').format(selectedDate);
 
-                    final calculatedTarget = PrayerTimeHelper.calculateTargetTime(
+                    final scheduledStartDateTime = PrayerTimeHelper.calculateTargetTimeForDate(
+                      date: selectedDate,
                       isPrayerRelative: timeMode == 'PRAYER_RELATIVE',
                       clockTime: startTime,
                       prayerName: selectedPrayer,
@@ -725,17 +785,12 @@ class _TaskSchedulerScreenState extends ConsumerState<TaskSchedulerScreen> {
                       settings: prayerSettings,
                     );
 
-                    var scheduledStartDateTime = DateTime(
-                      selectedDate.year,
-                      selectedDate.month,
-                      selectedDate.day,
-                      calculatedTarget.hour,
-                      calculatedTarget.minute,
-                    );
-
-                    // If scheduled time has already passed today, advance to tomorrow so alarm always fires
-                    if (scheduledStartDateTime.isBefore(DateTime.now())) {
-                      scheduledStartDateTime = scheduledStartDateTime.add(const Duration(days: 1));
+                    if (taskToEdit == null &&
+                        !scheduledStartDateTime.isAfter(DateTime.now())) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Choose a future task date and time.')),
+                      );
+                      return;
                     }
 
                     final savedStartTimeStr = PrayerTimeHelper.formatScheduleTimeString(
@@ -751,14 +806,16 @@ class _TaskSchedulerScreenState extends ConsumerState<TaskSchedulerScreen> {
                     final scheduledEndDateTime = scheduledStartDateTime.add(Duration(minutes: durationMinutes));
                     final savedEndTimeStr = DateFormat('hh:mm a').format(scheduledEndDateTime);
 
+                    late final WorkTask savedTask;
                     if (taskToEdit == null) {
-                      await ref.read(todayTasksProvider.notifier).addTask(
+                      savedTask = await ref.read(todayTasksProvider.notifier).addTask(
                             title: titleController.text.trim(),
                             description: descController.text.trim(),
                             scheduledDate: scheduledDateIso,
                             startTime: savedStartTimeStr,
                             endTime: savedEndTimeStr,
                             durationMinutes: durationMinutes,
+                            reminderMinutes: reminderMinutes,
                             priority: priority,
                           );
                     } else {
@@ -770,36 +827,16 @@ class _TaskSchedulerScreenState extends ConsumerState<TaskSchedulerScreen> {
                         startTime: savedStartTimeStr,
                         endTime: savedEndTimeStr,
                         durationMinutes: durationMinutes,
+                        reminderMinutes: reminderMinutes,
                         priority: priority,
                         status: taskToEdit.status,
                         createdAt: taskToEdit.createdAt,
                       );
                       await ref.read(todayTasksProvider.notifier).updateTask(updated);
+                      savedTask = updated;
                     }
 
-                    // 1. Schedule notification for start time
-                    if (scheduledStartDateTime.isAfter(DateTime.now())) {
-                      await NotificationService.instance.scheduleNotification(
-                        id: scheduledStartDateTime.millisecondsSinceEpoch ~/ 1000,
-                        title: '🚀 Task Started: ${titleController.text.trim()}',
-                        body: 'Your $durationMinutes-minute scheduled task starts now ($savedStartTimeStr).',
-                        scheduledDate: scheduledStartDateTime,
-                        channelId: AppConstants.taskChannelId,
-                        channelName: AppConstants.taskChannelName,
-                      );
-                    }
-
-                    // 2. Schedule notification for task timeout (end of duration)
-                    if (scheduledEndDateTime.isAfter(DateTime.now())) {
-                      await NotificationService.instance.scheduleNotification(
-                        id: (scheduledEndDateTime.millisecondsSinceEpoch ~/ 1000) + 1,
-                        title: '⏰ Task Timeout Alarm: ${titleController.text.trim()}',
-                        body: 'Time is up! Your $durationMinutes-minute work session for "${titleController.text.trim()}" has completed.',
-                        scheduledDate: scheduledEndDateTime,
-                        channelId: AppConstants.taskChannelId,
-                        channelName: AppConstants.taskChannelName,
-                      );
-                    }
+                    await TaskAlarmScheduler.schedule(savedTask, scheduledStartDateTime);
 
                     if (context.mounted) {
                       Navigator.pop(ctx);

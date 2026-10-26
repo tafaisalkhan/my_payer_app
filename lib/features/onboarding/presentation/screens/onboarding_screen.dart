@@ -5,7 +5,6 @@ import 'package:mynamaz_scheduler/core/notifications/notification_service.dart';
 import 'package:mynamaz_scheduler/core/theme/app_theme.dart';
 import 'package:mynamaz_scheduler/features/prayer/presentation/providers/prayer_providers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:mynamaz_scheduler/shared/widgets/banner_ad_widget.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
@@ -49,7 +48,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     decoration: BoxDecoration(
                       color: index == _step
                           ? AppTheme.emeraldPrimary
-                          : Colors.grey.shade300,
+                          : Theme.of(context).colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(4),
                     ),
                   );
@@ -78,7 +77,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           ),
         ),
       ),
-      bottomNavigationBar: const BannerAdWidget(),
     );
   }
 
@@ -107,7 +105,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             Text(
               'Accurate 5 Daily Prayer Timings, Qibla Compass, Quran Recitation Reminders, and Daily Activity Tracker.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey.shade700, height: 1.5),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, height: 1.5),
             ),
           ],
         );
@@ -124,7 +122,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               const SizedBox(height: 8),
               Text(
                 'Select your preferred calculation authority and Asr juristic school.',
-                style: TextStyle(color: Colors.grey.shade700),
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
               const SizedBox(height: 20),
               const Text('Calculation Method', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -190,7 +188,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             Text(
               'We use location to calculate accurate prayer timings for your city and send timely Adhan reminders.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey.shade700, height: 1.5),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, height: 1.5),
             ),
           ],
         );

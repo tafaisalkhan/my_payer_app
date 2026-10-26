@@ -26,6 +26,9 @@ class AppDatabase {
           await db.execute('ALTER TABLE work_tasks ADD COLUMN duration_minutes INTEGER DEFAULT 45');
         } catch (_) {}
         try {
+          await db.execute('ALTER TABLE work_tasks ADD COLUMN reminder_minutes INTEGER DEFAULT 10');
+        } catch (_) {}
+        try {
           await db.execute('ALTER TABLE quran_schedules ADD COLUMN duration_minutes INTEGER DEFAULT 30');
         } catch (_) {}
       },
@@ -95,6 +98,7 @@ class AppDatabase {
         start_time TEXT NOT NULL,
         end_time TEXT,
         duration_minutes INTEGER NOT NULL DEFAULT 45,
+        reminder_minutes INTEGER NOT NULL DEFAULT 10,
         priority TEXT NOT NULL DEFAULT 'MEDIUM',
         status TEXT NOT NULL DEFAULT 'PENDING',
         created_at TEXT NOT NULL

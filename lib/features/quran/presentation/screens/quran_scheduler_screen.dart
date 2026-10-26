@@ -74,7 +74,7 @@ class QuranSchedulerScreen extends ConsumerWidget {
                         const SizedBox(height: 4),
                         Text(
                           'Schedule daily, weekly, or monthly Surah or Part (Juz) recitation reminders with alarm.',
-                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                          style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
                         ),
                       ],
                     ),
@@ -122,7 +122,7 @@ class QuranSchedulerScreen extends ConsumerWidget {
                           const SizedBox(height: 4),
                           Text(
                             'Date: ${DateFormat('EEE, MMM d, yyyy').format(sch.createdAt)} • Start: ${sch.recitationTime} (${sch.durationMinutes} mins) • Frequency: ${sch.frequency}',
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                            style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
                           ),
                           if (sch.notes?.isNotEmpty == true) ...[
                             const SizedBox(height: 4),
@@ -215,7 +215,7 @@ class QuranSchedulerScreen extends ConsumerWidget {
             const SizedBox(height: 12),
 
             if (history.isEmpty)
-              Text('No completion history logged yet.', style: TextStyle(color: Colors.grey.shade600))
+              Text('No completion history logged yet.', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant))
             else
               ListView.separated(
                 shrinkWrap: true,

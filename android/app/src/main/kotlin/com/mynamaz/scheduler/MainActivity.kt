@@ -37,7 +37,7 @@ class MainActivity: FlutterActivity() {
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         // Intercept any hardware button press (Volume Up, Volume Down, Power, Media, Back)
-        if (isSoundPlaying && event.action == KeyEvent.ACTION_DOWN) {
+        if ((isSoundPlaying || PrayerAlarmService.isRinging) && event.action == KeyEvent.ACTION_DOWN) {
             when (event.keyCode) {
                 KeyEvent.KEYCODE_VOLUME_UP,
                 KeyEvent.KEYCODE_VOLUME_DOWN,
@@ -57,7 +57,7 @@ class MainActivity: FlutterActivity() {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        if (isSoundPlaying) {
+        if (isSoundPlaying || PrayerAlarmService.isRinging) {
             when (keyCode) {
                 KeyEvent.KEYCODE_VOLUME_UP,
                 KeyEvent.KEYCODE_VOLUME_DOWN,
@@ -228,17 +228,6 @@ class MainActivity: FlutterActivity() {
                 "scheduleNativePrayerAlarms" -> {
                     try {
                         val alarms = call.argument<List<Map<String, Any>>>("alarms") ?: emptyList()
-                        val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
-                        val showIntent = Intent(this, MainActivity::class.java).apply {
-                            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                        }
-                        val showPendingIntent = PendingIntent.getActivity(
-                            this,
-                            0,
-                            showIntent,
-                            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                        )
-
                         for (alarm in alarms) {
                             val id = (alarm["id"] as? Number)?.toInt() ?: continue
                             val timeMs = (alarm["timeMs"] as? Number)?.toLong() ?: continue
@@ -247,33 +236,7 @@ class MainActivity: FlutterActivity() {
                             val eventType = alarm["eventType"] as? String ?: "AZAN"
                             val soundType = alarm["soundType"] as? String ?: "ADHAN"
 
-                            if (timeMs <= System.currentTimeMillis()) continue
-
-                            val intent = Intent(this, PrayerAlarmReceiver::class.java).apply {
-                                action = PrayerAlarmReceiver.ACTION_PRAYER_ALARM
-                                putExtra(PrayerAlarmReceiver.EXTRA_ALARM_ID, id)
-                                putExtra(PrayerAlarmReceiver.EXTRA_PRAYER_NAME, name)
-                                putExtra(PrayerAlarmReceiver.EXTRA_PRAYER_TITLE, title)
-                                putExtra(PrayerAlarmReceiver.EXTRA_EVENT_TYPE, eventType)
-                                putExtra(PrayerAlarmReceiver.EXTRA_SOUND_TYPE, soundType)
-                            }
-                            val pendingIntent = PendingIntent.getBroadcast(
-                                this,
-                                id,
-                                intent,
-                                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                            )
-
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                                alarmManager.setAlarmClock(
-                                    AlarmManager.AlarmClockInfo(timeMs, showPendingIntent),
-                                    pendingIntent
-                                )
-                            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, timeMs, pendingIntent)
-                            } else {
-                                alarmManager.setExact(AlarmManager.RTC_WAKEUP, timeMs, pendingIntent)
-                            }
+                            PersistedAlarmScheduler.schedule(this, id, timeMs, name, title, eventType, soundType)
                         }
                         result.success(true)
                     } catch (e: Exception) {
@@ -289,44 +252,7 @@ class MainActivity: FlutterActivity() {
                         val eventType = call.argument<String>("eventType") ?: "AZAN"
                         val soundType = call.argument<String>("soundType") ?: "ADHAN"
 
-                        if (timeMs > System.currentTimeMillis()) {
-                            val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
-                            val showIntent = Intent(this, MainActivity::class.java).apply {
-                                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                            }
-                            val showPendingIntent = PendingIntent.getActivity(
-                                this,
-                                0,
-                                showIntent,
-                                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                            )
-
-                            val intent = Intent(this, PrayerAlarmReceiver::class.java).apply {
-                                action = PrayerAlarmReceiver.ACTION_PRAYER_ALARM
-                                putExtra(PrayerAlarmReceiver.EXTRA_ALARM_ID, id)
-                                putExtra(PrayerAlarmReceiver.EXTRA_PRAYER_NAME, name)
-                                putExtra(PrayerAlarmReceiver.EXTRA_PRAYER_TITLE, title)
-                                putExtra(PrayerAlarmReceiver.EXTRA_EVENT_TYPE, eventType)
-                                putExtra(PrayerAlarmReceiver.EXTRA_SOUND_TYPE, soundType)
-                            }
-                            val pendingIntent = PendingIntent.getBroadcast(
-                                this,
-                                id,
-                                intent,
-                                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                            )
-
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                                alarmManager.setAlarmClock(
-                                    AlarmManager.AlarmClockInfo(timeMs, showPendingIntent),
-                                    pendingIntent
-                                )
-                            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, timeMs, pendingIntent)
-                            } else {
-                                alarmManager.setExact(AlarmManager.RTC_WAKEUP, timeMs, pendingIntent)
-                            }
-                        }
+                        PersistedAlarmScheduler.schedule(this, id, timeMs, name, title, eventType, soundType)
                         result.success(true)
                     } catch (e: Exception) {
                         result.error("ALARM_SCHEDULE_ERROR", e.message, null)
@@ -335,18 +261,8 @@ class MainActivity: FlutterActivity() {
                 "cancelNativePrayerAlarms" -> {
                     try {
                         val ids = call.argument<List<Int>>("ids") ?: emptyList()
-                        val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
                         for (id in ids) {
-                            val intent = Intent(this, PrayerAlarmReceiver::class.java).apply {
-                                action = PrayerAlarmReceiver.ACTION_PRAYER_ALARM
-                            }
-                            val pendingIntent = PendingIntent.getBroadcast(
-                                this,
-                                id,
-                                intent,
-                                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                            )
-                            alarmManager.cancel(pendingIntent)
+                            PersistedAlarmScheduler.cancel(this, id)
                         }
                         result.success(true)
                     } catch (e: Exception) {

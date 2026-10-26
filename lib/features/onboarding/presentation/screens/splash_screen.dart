@@ -10,7 +10,8 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
   late Animation<double> _fadeAnimation;
@@ -42,7 +43,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     if (!mounted) return;
 
     final prefs = await SharedPreferences.getInstance();
-    final bool onboardingCompleted = prefs.getBool('onboarding_completed') ?? false;
+    final bool onboardingCompleted =
+        prefs.getBool('onboarding_completed') ?? false;
 
     if (mounted) {
       if (onboardingCompleted) {
@@ -61,22 +63,31 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final splashForeground = isDark ? Colors.white : scheme.onSurface;
     return Scaffold(
-      backgroundColor: const Color(0xFF064E3B),
+      backgroundColor: scheme.surface,
       body: Stack(
         children: [
           // Background ambient gradient glow
           Positioned.fill(
             child: Container(
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 gradient: RadialGradient(
                   center: Alignment(0.0, -0.2),
                   radius: 1.2,
-                  colors: [
-                    Color(0xFF0F766E),
-                    Color(0xFF064E3B),
-                    Color(0xFF022C22),
-                  ],
+                  colors: isDark
+                      ? const [
+                          Color(0xFF0F766E),
+                          Color(0xFF064E3B),
+                          Color(0xFF022C22)
+                        ]
+                      : [
+                          scheme.primaryContainer,
+                          scheme.surface,
+                          scheme.surface
+                        ],
                 ),
               ),
             ),
@@ -103,7 +114,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                             borderRadius: BorderRadius.circular(32),
                             boxShadow: [
                               BoxShadow(
-                                color: AppTheme.goldAccent.withValues(alpha: 0.35),
+                                color:
+                                    AppTheme.goldAccent.withValues(alpha: 0.35),
                                 blurRadius: 28,
                                 spreadRadius: 4,
                                 offset: const Offset(0, 10),
@@ -141,24 +153,25 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                     // App Title
                     FadeTransition(
                       opacity: _fadeAnimation,
-                      child: const Column(
+                      child: Column(
                         children: [
                           Text(
                             'My Namaz Scheduler',
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              color: Colors.white,
+                              color: splashForeground,
                               fontSize: 26,
                               fontWeight: FontWeight.bold,
                               letterSpacing: 0.5,
                             ),
                           ),
-                          SizedBox(height: 8),
+                          const SizedBox(height: 8),
                           Text(
                             'Intelligent Islamic Daily Planner',
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              color: AppTheme.goldLight,
+                              color:
+                                  isDark ? AppTheme.goldLight : scheme.primary,
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
                               letterSpacing: 0.3,
@@ -180,7 +193,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                             height: 24,
                             child: CircularProgressIndicator(
                               strokeWidth: 2.5,
-                              valueColor: AlwaysStoppedAnimation<Color>(AppTheme.goldAccent),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                  AppTheme.goldAccent),
                             ),
                           ),
                           const SizedBox(height: 20),
@@ -188,7 +202,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                             'حَافِظُوا عَلَى الصَّلَوَاتِ وَالصَّلَاةِ الْوُسْطَىٰ',
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.7),
+                              color: splashForeground.withValues(alpha: 0.7),
                               fontSize: 13,
                               fontWeight: FontWeight.w500,
                             ),
@@ -198,7 +212,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                             '“Guard strictly your prayers, especially the middle prayer”',
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.5),
+                              color: splashForeground.withValues(alpha: 0.5),
                               fontSize: 11,
                             ),
                           ),

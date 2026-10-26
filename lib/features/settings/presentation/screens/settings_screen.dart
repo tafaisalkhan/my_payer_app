@@ -13,8 +13,10 @@ final themeModeProvider = StateNotifierProvider<ThemeModeNotifier, ThemeMode>((r
 });
 
 class ThemeModeNotifier extends StateNotifier<ThemeMode> {
+  late final Future<void> _ready;
+
   ThemeModeNotifier() : super(ThemeMode.system) {
-    _loadTheme();
+    _ready = _loadTheme();
   }
 
   Future<void> _loadTheme() async {
@@ -30,6 +32,7 @@ class ThemeModeNotifier extends StateNotifier<ThemeMode> {
   }
 
   Future<void> setTheme(ThemeMode mode) async {
+    await _ready;
     final prefs = await SharedPreferences.getInstance();
     state = mode;
     await prefs.setString('pref_theme_mode', mode.name);
@@ -118,8 +121,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Settings'),
-        backgroundColor: AppTheme.emeraldPrimary,
-        foregroundColor: Colors.white,
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        foregroundColor: Theme.of(context).colorScheme.onPrimary,
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -168,6 +171,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
+                    key: ValueKey(settings.method),
                     initialValue: settings.method,
                     isExpanded: true,
                     decoration: InputDecoration(
@@ -440,15 +444,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: AppTheme.emeraldPrimary),
-              onPressed: () {
-                ref.read(prayerSettingsProvider.notifier).updateOffsets(
+              onPressed: () async {
+                await ref.read(prayerSettingsProvider.notifier).updateOffsets(
                       fajr: fajr,
                       dhuhr: dhuhr,
                       asr: asr,
                       maghrib: maghrib,
                       isha: isha,
                     );
-                Navigator.pop(ctx);
+                if (ctx.mounted) Navigator.pop(ctx);
               },
               child: const Text('Save', style: TextStyle(color: Colors.white)),
             ),
@@ -645,7 +649,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         if (isRemoved) {
           final isReward = AdService.instance.isRewardAdFreeActive;
           return Card(
-            color: Colors.green.shade50,
+            color: Theme.of(context).colorScheme.surfaceContainerHigh,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
               side: BorderSide(color: Colors.green.shade300),
@@ -666,7 +670,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   isReward ? AdService.instance.remainingRewardAdFreeText : 'ACTIVE',
                   style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 11),
                 ),
-                backgroundColor: Colors.white,
+                backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
               ),
             ),
           );

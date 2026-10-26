@@ -213,7 +213,7 @@ class QiblaCompassScreen extends ConsumerWidget {
             Text(
               'Your device does not support live compass sensors. Qibla bearing to Makkah from your location is:',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey.shade600),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 16),
             Container(

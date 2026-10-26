@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,6 +9,7 @@ import 'package:mynamaz_scheduler/core/theme/app_theme.dart';
 import 'package:mynamaz_scheduler/core/utils/date_formatter.dart';
 import 'package:mynamaz_scheduler/features/prayer/domain/models/prayer_record.dart';
 import 'package:mynamaz_scheduler/features/prayer/domain/models/prayer_timing.dart';
+import 'package:mynamaz_scheduler/features/prayer/domain/models/voluntary_prayer_timing.dart';
 import 'package:mynamaz_scheduler/features/prayer/presentation/providers/prayer_providers.dart';
 import 'package:mynamaz_scheduler/features/quran/presentation/providers/quran_providers.dart';
 import 'package:mynamaz_scheduler/features/tasks/domain/models/work_task.dart';
@@ -27,13 +29,25 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
   String _selectedPeriod = 'daily';
 
   DateTime? _screenInitTime;
+  late DateTime _loadedDay;
 
   @override
   void initState() {
     super.initState();
     _screenInitTime = DateTime.now();
+    _loadedDay = DateTime(_screenInitTime!.year, _screenInitTime!.month, _screenInitTime!.day);
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) {
+        final now = DateTime.now();
+        final today = DateTime(now.year, now.month, now.day);
+        if (today != _loadedDay) {
+          _loadedDay = today;
+          ref.invalidate(prayerTimingsProvider);
+          ref.invalidate(nextPrayerProvider);
+          ref.invalidate(voluntaryPrayerTimingsProvider);
+          ref.invalidate(todayPrayerRecordsProvider);
+          ref.invalidate(dashboardTodayTasksProvider);
+        }
         _checkAndAutoPlayAdhan();
         setState(() {});
       }
@@ -62,8 +76,10 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
       // Play Adhan ONLY when prayer time arrives in real time (within 3 seconds of entry)
       if (diffSeconds >= 0 && diffSeconds <= 3 && !alreadyPlayed) {
         await prefs.setBool(key, true);
-        final isAlreadyRinging = await NotificationService.instance.isAlarmRinging();
-        if (!isAlreadyRinging) {
+        // Android's persisted alarm owns playback; a second Flutter player can
+        // race it at the same prayer time and produce two simultaneous adhans.
+        if (!Platform.isAndroid &&
+            !await NotificationService.instance.isAlarmRinging()) {
           await NotificationService.instance.playPrayerAdhan();
         }
         if (mounted) {
@@ -90,9 +106,10 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
   Widget build(BuildContext context) {
     final locationAsync = ref.watch(locationDataProvider);
     final prayerTimings = ref.watch(prayerTimingsProvider);
+    final voluntaryTimings = ref.watch(voluntaryPrayerTimingsProvider);
     final todayRecords = ref.watch(todayPrayerRecordsProvider);
     final quranSchedules = ref.watch(quranSchedulesProvider);
-    final todayTasks = ref.watch(todayTasksProvider);
+    final todayTasks = ref.watch(dashboardTodayTasksProvider).valueOrNull ?? <WorkTask>[];
 
     final now = DateTime.now();
     final location = locationAsync.valueOrNull;
@@ -119,7 +136,7 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
             ),
             Text(
               '${DateFormatter.formatGregorian(now)} • ${DateFormatter.formatHijri(now)}',
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.normal),
+              style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant, fontWeight: FontWeight.normal),
             ),
           ],
         ),
@@ -189,6 +206,9 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
               ),
               const SizedBox(height: 10),
               _buildPrayerScheduleList(prayerTimings, todayRecords),
+              const SizedBox(height: 20),
+
+              _buildVoluntaryPrayerList(voluntaryTimings),
               const SizedBox(height: 20),
 
               // 4. Quran Recitation Reminder Card
@@ -393,7 +413,7 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
                       child: LinearProgressIndicator(
                         value: pct,
                         minHeight: 12,
-                        backgroundColor: Colors.grey.shade200,
+                        backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                         color: AppTheme.emeraldPrimary,
                       ),
                     ),
@@ -423,7 +443,7 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
       selected: isSelected,
       selectedColor: AppTheme.emeraldPrimary,
       labelStyle: TextStyle(
-        color: isSelected ? Colors.white : Colors.black87,
+        color: isSelected ? Colors.white : Theme.of(context).colorScheme.onSurface,
         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
         fontSize: 12,
       ),
@@ -494,7 +514,7 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
               child: Icon(
                 isDone ? Icons.check : Icons.access_time,
                 size: 20,
-                color: isDone ? Colors.green.shade800 : (isNextToday ? Colors.white : Colors.grey.shade700),
+                color: isDone ? Colors.green.shade800 : (isNextToday ? Colors.white : Theme.of(context).colorScheme.onSurfaceVariant),
               ),
             ),
             title: Text(
@@ -516,6 +536,33 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
           ),
         );
       }).toList(),
+    );
+  }
+
+  Widget _buildVoluntaryPrayerList(List<VoluntaryPrayerTiming> timings) {
+    if (timings.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Optional Prayer Times',
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 4),
+        const Text('Suggested times • No adhan',
+            style: TextStyle(fontSize: 12, color: Colors.grey)),
+        const SizedBox(height: 10),
+        for (final timing in timings)
+          Card(
+            margin: const EdgeInsets.only(bottom: 8),
+            child: ListTile(
+              leading: const Icon(Icons.nights_stay_outlined,
+                  color: AppTheme.emeraldPrimary),
+              title: Text(timing.name),
+              subtitle: Text(timing.description),
+              trailing: Text(DateFormatter.formatTime(timing.time),
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ),
+      ],
     );
   }
 
@@ -556,12 +603,12 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
               const SizedBox(height: 4),
               Text(
                 'Recitation Time: ${active.recitationTime} • Frequency: ${active.frequency}',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
             ] else
               Text(
                 'No active Quran recitation schedule. Tap Manage to schedule.',
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13),
               ),
           ],
         ),
@@ -606,12 +653,12 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
               const SizedBox(height: 4),
               Text(
                 'Next: ${pendingTasks.first.title} (${pendingTasks.first.startTime})',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
             ] else
               Text(
                 'No pending tasks for today.',
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13),
               ),
           ],
         ),

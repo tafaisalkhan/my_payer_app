@@ -2,12 +2,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:mynamaz_scheduler/features/tasks/data/repositories/task_repository.dart';
 import 'package:mynamaz_scheduler/features/tasks/domain/models/work_task.dart';
+import 'package:mynamaz_scheduler/features/tasks/domain/task_alarm_scheduler.dart';
 
 final taskRepositoryProvider = Provider<TaskRepository>((ref) => TaskRepository());
 
 final todayTasksProvider = StateNotifierProvider<TodayTasksNotifier, List<WorkTask>>((ref) {
   final repo = ref.watch(taskRepositoryProvider);
   return TodayTasksNotifier(repo);
+});
+
+final dashboardTodayTasksProvider = FutureProvider<List<WorkTask>>((ref) async {
+  ref.watch(todayTasksProvider);
+  final todayIso = DateFormat('yyyy-MM-dd').format(DateTime.now());
+  return ref.watch(taskRepositoryProvider).getTasksForDate(todayIso);
 });
 
 class TodayTasksNotifier extends StateNotifier<List<WorkTask>> {
@@ -27,12 +34,13 @@ class TodayTasksNotifier extends StateNotifier<List<WorkTask>> {
     state = await _repo.getTasksForDate(_currentDateIso);
   }
 
-  Future<void> addTask({
+  Future<WorkTask> addTask({
     required String title,
     String? description,
     required String startTime,
     String? endTime,
     int durationMinutes = 45,
+    int reminderMinutes = 10,
     String? scheduledDate,
     TaskPriority priority = TaskPriority.medium,
   }) async {
@@ -45,6 +53,7 @@ class TodayTasksNotifier extends StateNotifier<List<WorkTask>> {
       startTime: startTime,
       endTime: endTime,
       durationMinutes: durationMinutes,
+      reminderMinutes: reminderMinutes,
       priority: priority,
       status: TaskStatus.pending,
       createdAt: DateTime.now(),
@@ -52,6 +61,7 @@ class TodayTasksNotifier extends StateNotifier<List<WorkTask>> {
 
     await _repo.saveTask(task);
     await loadTasks(dateStr);
+    return task;
   }
 
   Future<void> updateTaskStatus(String id, TaskStatus status) async {
@@ -64,21 +74,26 @@ class TodayTasksNotifier extends StateNotifier<List<WorkTask>> {
       startTime: task.startTime,
       endTime: task.endTime,
       durationMinutes: task.durationMinutes,
+      reminderMinutes: task.reminderMinutes,
       priority: task.priority,
       status: status,
       createdAt: task.createdAt,
     );
 
     await _repo.saveTask(updated);
+    if (status == TaskStatus.completed) {
+      await TaskAlarmScheduler.cancel(id);
+    }
     await loadTasks();
   }
 
   Future<void> updateTask(WorkTask task) async {
     await _repo.saveTask(task);
-    await loadTasks();
+    await loadTasks(task.scheduledDate);
   }
 
   Future<void> deleteTask(String id) async {
+    await TaskAlarmScheduler.cancel(id);
     await _repo.deleteTask(id);
     await loadTasks();
   }

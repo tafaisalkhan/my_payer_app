@@ -9,6 +9,7 @@ class WorkTask {
   final String startTime; // HH:mm
   final String? endTime;
   final int durationMinutes;
+  final int reminderMinutes;
   final String frequency; // One-Time, Daily, Weekly, Monthly
   final TaskPriority priority;
   final TaskStatus status;
@@ -22,6 +23,7 @@ class WorkTask {
     required this.startTime,
     this.endTime,
     this.durationMinutes = 45,
+    this.reminderMinutes = 10,
     this.frequency = 'One-Time',
     this.priority = TaskPriority.medium,
     this.status = TaskStatus.pending,
@@ -37,6 +39,7 @@ class WorkTask {
       'start_time': startTime,
       'end_time': endTime,
       'duration_minutes': durationMinutes,
+      'reminder_minutes': reminderMinutes,
       'priority': priority.name.toUpperCase(),
       'status': status.name.toUpperCase(),
       'created_at': createdAt.toIso8601String(),
@@ -60,6 +63,7 @@ class WorkTask {
       startTime: map['start_time'] as String,
       endTime: map['end_time'] as String?,
       durationMinutes: map['duration_minutes'] as int? ?? 45,
+      reminderMinutes: map['reminder_minutes'] as int? ?? 10,
       frequency: 'One-Time',
       priority: p,
       status: s,
