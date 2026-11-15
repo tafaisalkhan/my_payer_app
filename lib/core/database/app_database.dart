@@ -19,17 +19,27 @@ class AppDatabase {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _createDB,
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 3) {
+          await db.execute('ALTER TABLE prayer_records ADD COLUMN place TEXT');
+          await db.execute(
+              'ALTER TABLE prayer_records ADD COLUMN joined_rakats INTEGER');
+        }
+      },
       onOpen: (db) async {
         try {
-          await db.execute('ALTER TABLE work_tasks ADD COLUMN duration_minutes INTEGER DEFAULT 45');
+          await db.execute(
+              'ALTER TABLE work_tasks ADD COLUMN duration_minutes INTEGER DEFAULT 45');
         } catch (_) {}
         try {
-          await db.execute('ALTER TABLE work_tasks ADD COLUMN reminder_minutes INTEGER DEFAULT 10');
+          await db.execute(
+              'ALTER TABLE work_tasks ADD COLUMN reminder_minutes INTEGER DEFAULT 10');
         } catch (_) {}
         try {
-          await db.execute('ALTER TABLE quran_schedules ADD COLUMN duration_minutes INTEGER DEFAULT 30');
+          await db.execute(
+              'ALTER TABLE quran_schedules ADD COLUMN duration_minutes INTEGER DEFAULT 30');
         } catch (_) {}
       },
     );
@@ -52,6 +62,8 @@ class AppDatabase {
         prayer_name TEXT NOT NULL,
         status TEXT NOT NULL,
         takbir_e_ula INTEGER NOT NULL DEFAULT 0,
+        place TEXT,
+        joined_rakats INTEGER,
         updated_at TEXT NOT NULL
       )
     ''');

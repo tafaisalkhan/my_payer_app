@@ -10,9 +10,11 @@ import 'package:mynamaz_scheduler/core/constants/app_constants.dart';
 
 class NotificationService {
   static final NotificationService instance = NotificationService._init();
-  final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin _notifications =
+      FlutterLocalNotificationsPlugin();
   final AudioPlayer _audioPlayer = AudioPlayer();
-  static const MethodChannel _volumeChannel = MethodChannel('com.mynamaz.scheduler/volume');
+  static const MethodChannel _volumeChannel =
+      MethodChannel('com.mynamaz.scheduler/volume');
 
   final ValueNotifier<bool> isAdhanPlayingNotifier = ValueNotifier<bool>(false);
   bool get isAdhanPlaying => isAdhanPlayingNotifier.value;
@@ -34,7 +36,8 @@ class NotificationService {
         isAdhanPlayingNotifier.value = playing;
         if (!playing) {
           restoreVolume();
-          _volumeChannel.invokeMethod('setSoundPlaying', {'isPlaying': false}).catchError((_) {});
+          _volumeChannel.invokeMethod(
+              'setSoundPlaying', {'isPlaying': false}).catchError((_) {});
         }
       }
     });
@@ -65,7 +68,8 @@ class NotificationService {
       const AndroidInitializationSettings androidSettings =
           AndroidInitializationSettings('@mipmap/ic_launcher');
 
-      const DarwinInitializationSettings iosSettings = DarwinInitializationSettings(
+      const DarwinInitializationSettings iosSettings =
+          DarwinInitializationSettings(
         requestAlertPermission: true,
         requestBadgePermission: true,
         requestSoundPermission: true,
@@ -88,8 +92,9 @@ class NotificationService {
 
     if (Platform.isAndroid) {
       try {
-        final androidImplementation = _notifications
-            .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+        final androidImplementation =
+            _notifications.resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin>();
 
         if (androidImplementation != null) {
           try {
@@ -97,7 +102,8 @@ class NotificationService {
               const AndroidNotificationChannel(
                 AppConstants.namazChannelId,
                 AppConstants.namazChannelName,
-                description: 'Time-sensitive notifications for 5 daily prayer times',
+                description:
+                    'Time-sensitive notifications for 5 daily prayer times',
                 importance: Importance.max,
                 playSound: true,
                 enableVibration: true,
@@ -140,7 +146,8 @@ class NotificationService {
               AndroidNotificationChannel(
                 AppConstants.taskChannelId,
                 AppConstants.taskChannelName,
-                description: 'Scheduled work task activity reminders and alarms',
+                description:
+                    'Scheduled work task activity reminders and alarms',
                 importance: Importance.max,
                 playSound: true,
                 enableVibration: true,
@@ -165,23 +172,28 @@ class NotificationService {
   Future<String?> getSystemAlarmUri() async {
     if (_systemAlarmUri != null) return _systemAlarmUri;
     try {
-      _systemAlarmUri = await _volumeChannel.invokeMethod<String>('getSystemAlarmUri');
+      _systemAlarmUri =
+          await _volumeChannel.invokeMethod<String>('getSystemAlarmUri');
     } catch (_) {}
     return _systemAlarmUri;
   }
 
   Future<bool> requestPermissions() async {
     if (Platform.isAndroid) {
-      final androidImplementation = _notifications
-          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
-      final notif = await androidImplementation?.requestNotificationsPermission() ?? false;
+      final androidImplementation =
+          _notifications.resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
+      final notif =
+          await androidImplementation?.requestNotificationsPermission() ??
+              false;
       try {
         await androidImplementation?.requestExactAlarmsPermission();
       } catch (_) {}
       return notif;
     } else if (Platform.isIOS) {
-      final iosImplementation = _notifications
-          .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
+      final iosImplementation =
+          _notifications.resolvePlatformSpecificImplementation<
+              IOSFlutterLocalNotificationsPlugin>();
       return await iosImplementation?.requestPermissions(
             alert: true,
             badge: true,
@@ -227,7 +239,8 @@ class NotificationService {
       return;
     }
 
-    final tz.TZDateTime tzScheduled = tz.TZDateTime.from(scheduledDate, tz.local);
+    final tz.TZDateTime tzScheduled =
+        tz.TZDateTime.from(scheduledDate, tz.local);
     const iosDetails = DarwinNotificationDetails(
       presentAlert: true,
       presentBadge: true,
@@ -270,12 +283,22 @@ class NotificationService {
 
   Timer? _adhan5SecTimer;
 
-  Future<void> playPrayerAdhan() async {
+  Future<void> playPrayerAdhan({bool longAdhan = false}) async {
     try {
       _adhan5SecTimer?.cancel();
       await _volumeChannel.invokeMethod('setSoundPlaying', {'isPlaying': true});
       await boostVolume(); // Increase volume to max for Azan & request exclusive audio focus
-      await _audioPlayer.setAsset('assets/audio/short_adhan.mp3');
+      const asset = 'assets/audio/short_adhan.mp3';
+      if (longAdhan) {
+        await _audioPlayer.setAudioSource(
+          ConcatenatingAudioSource(children: [
+            AudioSource.asset(asset),
+            AudioSource.asset(asset),
+          ]),
+        );
+      } else {
+        await _audioPlayer.setAsset(asset);
+      }
       await _audioPlayer.setVolume(1.0);
       isAdhanPlayingNotifier.value = true;
       await _audioPlayer.play();
@@ -283,7 +306,8 @@ class NotificationService {
       isAdhanPlayingNotifier.value = false;
       await restoreVolume();
       try {
-        await _volumeChannel.invokeMethod('setSoundPlaying', {'isPlaying': false});
+        await _volumeChannel
+            .invokeMethod('setSoundPlaying', {'isPlaying': false});
       } catch (_) {}
     }
   }
@@ -308,7 +332,8 @@ class NotificationService {
       isAdhanPlayingNotifier.value = false;
       await restoreVolume();
       try {
-        await _volumeChannel.invokeMethod('setSoundPlaying', {'isPlaying': false});
+        await _volumeChannel
+            .invokeMethod('setSoundPlaying', {'isPlaying': false});
       } catch (_) {}
     }
   }
@@ -322,29 +347,34 @@ class NotificationService {
     isAdhanPlayingNotifier.value = false;
     await restoreVolume(); // Restore volume back to pre-Azan level & abandon audio focus
     try {
-      await _volumeChannel.invokeMethod('setSoundPlaying', {'isPlaying': false});
+      await _volumeChannel
+          .invokeMethod('setSoundPlaying', {'isPlaying': false});
     } catch (_) {}
     await stopNativePrayerAlarm();
   }
 
-  Future<void> scheduleNativePrayerAlarms(List<Map<String, dynamic>> alarms) async {
+  Future<void> scheduleNativePrayerAlarms(
+      List<Map<String, dynamic>> alarms) async {
     if (!Platform.isAndroid) return;
     try {
-      await _volumeChannel.invokeMethod('scheduleNativePrayerAlarms', {'alarms': alarms});
+      await _volumeChannel
+          .invokeMethod('scheduleNativePrayerAlarms', {'alarms': alarms});
     } catch (_) {}
   }
 
   Future<void> cancelNativePrayerAlarms(List<int> ids) async {
     if (!Platform.isAndroid) return;
     try {
-      await _volumeChannel.invokeMethod('cancelNativePrayerAlarms', {'ids': ids});
+      await _volumeChannel
+          .invokeMethod('cancelNativePrayerAlarms', {'ids': ids});
     } catch (_) {}
   }
 
   Future<bool> isAlarmRinging() async {
     if (!Platform.isAndroid) return isAdhanPlaying;
     try {
-      final res = await _volumeChannel.invokeMethod<bool>('isNativeAlarmRinging');
+      final res =
+          await _volumeChannel.invokeMethod<bool>('isNativeAlarmRinging');
       return (res ?? false) || isAdhanPlaying;
     } catch (_) {
       return isAdhanPlaying;
@@ -365,5 +395,29 @@ class NotificationService {
 
   Future<void> cancelAllNotifications() async {
     await _notifications.cancelAll();
+  }
+
+  Future<void> showPrayerTimeChanged({
+    required int id,
+    required String prayer,
+    required String oldTime,
+    required String newTime,
+  }) async {
+    const details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        'prayer_time_updates_v1',
+        'Prayer time updates',
+        channelDescription: 'Changes to calculated daily prayer times',
+        importance: Importance.defaultImportance,
+        priority: Priority.defaultPriority,
+      ),
+      iOS: DarwinNotificationDetails(),
+    );
+    await _notifications.show(
+      id,
+      '$prayer prayer time changed',
+      '$oldTime → $newTime today',
+      details,
+    );
   }
 }

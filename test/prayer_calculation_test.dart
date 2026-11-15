@@ -151,6 +151,8 @@ void main() {
         prayerName: 'Fajr',
         status: PrayerStatus.onTime,
         takbirEUla: true,
+        place: PrayerPlace.mosque,
+        joinedRakats: 4,
         updatedAt: now,
       );
 
@@ -158,11 +160,18 @@ void main() {
       expect(map['id'], equals('2026-10-09_FAJR'));
       expect(map['status'], equals('ONTIME'));
       expect(map['takbir_e_ula'], equals(1));
+      expect(map['place'], equals('MOSQUE'));
+      expect(map['joined_rakats'], equals(4));
 
       final restored = PrayerRecord.fromMap(map);
       expect(restored.prayerName, equals('Fajr'));
       expect(restored.status, equals(PrayerStatus.onTime));
       expect(restored.takbirEUla, isTrue);
+      expect(restored.place, PrayerPlace.mosque);
+      expect(restored.joinedRakats, 4);
+      expect(PrayerRecord.fardRakatCount('Dhuhr'), 4);
+      expect(PrayerRecord.fardRakatCount('Maghrib'), 3);
+      expect(PrayerRecord.fardRakatCount('Fajr'), 2);
     });
   });
 }

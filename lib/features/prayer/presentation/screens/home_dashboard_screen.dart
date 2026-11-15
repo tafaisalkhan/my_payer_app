@@ -7,10 +7,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mynamaz_scheduler/core/notifications/notification_service.dart';
 import 'package:mynamaz_scheduler/core/theme/app_theme.dart';
 import 'package:mynamaz_scheduler/core/utils/date_formatter.dart';
+import 'package:mynamaz_scheduler/core/utils/daily_mosque_image.dart';
 import 'package:mynamaz_scheduler/features/prayer/domain/models/prayer_record.dart';
 import 'package:mynamaz_scheduler/features/prayer/domain/models/prayer_timing.dart';
 import 'package:mynamaz_scheduler/features/prayer/domain/models/voluntary_prayer_timing.dart';
 import 'package:mynamaz_scheduler/features/prayer/presentation/providers/prayer_providers.dart';
+import 'package:mynamaz_scheduler/features/prayer/presentation/providers/prayer_adhan_provider.dart';
 import 'package:mynamaz_scheduler/features/quran/presentation/providers/quran_providers.dart';
 import 'package:mynamaz_scheduler/features/tasks/domain/models/work_task.dart';
 import 'package:mynamaz_scheduler/features/tasks/presentation/providers/task_providers.dart';
@@ -20,7 +22,8 @@ class HomeDashboardScreen extends ConsumerStatefulWidget {
   const HomeDashboardScreen({super.key});
 
   @override
-  ConsumerState<HomeDashboardScreen> createState() => _HomeDashboardScreenState();
+  ConsumerState<HomeDashboardScreen> createState() =>
+      _HomeDashboardScreenState();
 }
 
 class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
@@ -35,7 +38,8 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
   void initState() {
     super.initState();
     _screenInitTime = DateTime.now();
-    _loadedDay = DateTime(_screenInitTime!.year, _screenInitTime!.month, _screenInitTime!.day);
+    _loadedDay = DateTime(
+        _screenInitTime!.year, _screenInitTime!.month, _screenInitTime!.day);
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) {
         final now = DateTime.now();
@@ -59,14 +63,16 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
     final now = DateTime.now();
 
     for (final p in timings) {
-      final diffSeconds = now.difference(p.time).inSeconds;
+      final leadMinutes = ref.read(prayerAdhanLeadProvider)[p.name] ?? 0;
+      final adhanTime = p.time.subtract(Duration(minutes: leadMinutes));
+      final diffSeconds = now.difference(adhanTime).inSeconds;
       final key = 'adhan_played_${p.name}_${now.year}_${now.month}_${now.day}';
 
       final prefs = await SharedPreferences.getInstance();
       final bool alreadyPlayed = prefs.getBool(key) ?? false;
 
       // Do NOT play retroactively if prayer time passed before the app was started
-      if (_screenInitTime != null && p.time.isBefore(_screenInitTime!)) {
+      if (_screenInitTime != null && adhanTime.isBefore(_screenInitTime!)) {
         if (!alreadyPlayed) {
           await prefs.setBool(key, true);
         }
@@ -80,13 +86,17 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
         // race it at the same prayer time and produce two simultaneous adhans.
         if (!Platform.isAndroid &&
             !await NotificationService.instance.isAlarmRinging()) {
-          await NotificationService.instance.playPrayerAdhan();
+          final length =
+              ref.read(prayerAdhanProvider)[p.name] ?? AdhanLength.short;
+          await NotificationService.instance
+              .playPrayerAdhan(longAdhan: length == AdhanLength.long);
         }
         if (mounted) {
           ScaffoldMessenger.of(context).clearSnackBars();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('🕌 Prayer time for ${p.name} has entered! Allahu Akbar, Allahu Akbar!'),
+              content: Text(
+                  '🕌 Prayer time for ${p.name} has entered! Allahu Akbar, Allahu Akbar!'),
               backgroundColor: AppTheme.emeraldPrimary,
               duration: const Duration(seconds: 8),
             ),
@@ -109,7 +119,9 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
     final voluntaryTimings = ref.watch(voluntaryPrayerTimingsProvider);
     final todayRecords = ref.watch(todayPrayerRecordsProvider);
     final quranSchedules = ref.watch(quranSchedulesProvider);
-    final todayTasks = ref.watch(dashboardTodayTasksProvider).valueOrNull ?? <WorkTask>[];
+    final dailyPhoto = ref.watch(dailyMosqueImageProvider).valueOrNull;
+    final todayTasks =
+        ref.watch(dashboardTodayTasksProvider).valueOrNull ?? <WorkTask>[];
 
     final now = DateTime.now();
     final location = locationAsync.valueOrNull;
@@ -131,12 +143,17 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              location != null ? '${location.city}, ${location.country}' : 'My Namaz Scheduler',
+              location != null
+                  ? '${location.city}, ${location.country}'
+                  : 'My Namaz Scheduler',
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
             ),
             Text(
               '${DateFormatter.formatGregorian(now)} • ${DateFormatter.formatHijri(now)}',
-              style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant, fontWeight: FontWeight.normal),
+              style: TextStyle(
+                  fontSize: 11,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.normal),
             ),
           ],
         ),
@@ -158,6 +175,9 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              _buildDailyMosqueCard(dailyPhoto),
+              const SizedBox(height: 20),
+
               // 1. Next Prayer Hero Card
               if (nextPrayer != null) ...[
                 _buildNextPrayerHeroCard(nextPrayer),
@@ -177,18 +197,23 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
                     style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
                   ),
                   ValueListenableBuilder<bool>(
-                    valueListenable: NotificationService.instance.isAdhanPlayingNotifier,
+                    valueListenable:
+                        NotificationService.instance.isAdhanPlayingNotifier,
                     builder: (context, isPlaying, _) {
                       return TextButton.icon(
                         icon: Icon(
                           isPlaying ? Icons.stop_circle : Icons.volume_up,
                           size: 18,
-                          color: isPlaying ? Colors.redAccent : AppTheme.emeraldPrimary,
+                          color: isPlaying
+                              ? Colors.redAccent
+                              : AppTheme.emeraldPrimary,
                         ),
                         label: Text(
                           isPlaying ? 'Stop Adhan' : 'Play Adhan',
                           style: TextStyle(
-                            color: isPlaying ? Colors.redAccent : AppTheme.emeraldPrimary,
+                            color: isPlaying
+                                ? Colors.redAccent
+                                : AppTheme.emeraldPrimary,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -239,14 +264,7 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        image: const DecorationImage(
-          image: AssetImage('assets/images/mosque_hero.jpg'),
-          fit: BoxFit.cover,
-          colorFilter: ColorFilter.mode(
-            Color(0xCC064E3B),
-            BlendMode.darken,
-          ),
-        ),
+        color: AppTheme.emeraldPrimary,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
@@ -263,7 +281,8 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppTheme.goldAccent,
                   borderRadius: BorderRadius.all(Radius.circular(12)),
@@ -298,7 +317,8 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
           const SizedBox(height: 16),
           Row(
             children: [
-              const Icon(Icons.timer_outlined, color: AppTheme.goldLight, size: 20),
+              const Icon(Icons.timer_outlined,
+                  color: AppTheme.goldLight, size: 20),
               const SizedBox(width: 8),
               Text(
                 'Countdown: ${DateFormatter.formatDuration(displayRemaining)}',
@@ -311,6 +331,50 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildDailyMosqueCard(DailyMosqueImage? photo) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: Card(
+        margin: EdgeInsets.zero,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: double.infinity,
+              height: 180,
+              child: Image(
+                image: photo?.image ??
+                    const AssetImage('assets/images/mosque_hero.jpg'),
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Image.asset(
+                  'assets/images/mosque_hero.jpg',
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text("Today's mosque",
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  if (photo?.credit != null)
+                    Text(
+                      photo!.credit!,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -334,7 +398,8 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: AppTheme.emeraldPrimary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
@@ -355,11 +420,11 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  _buildPeriodTab('daily', 'Daily (5)'),
+                  _buildPeriodTab('daily', 'Daily'),
                   const SizedBox(width: 8),
-                  _buildPeriodTab('weekly', 'Weekly (35)'),
+                  _buildPeriodTab('weekly', 'Weekly'),
                   const SizedBox(width: 8),
-                  _buildPeriodTab('monthly', 'Monthly (150)'),
+                  _buildPeriodTab('monthly', 'Monthly'),
                   const SizedBox(width: 8),
                   _buildPeriodTab('yearly', 'Yearly'),
                 ],
@@ -413,7 +478,9 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
                       child: LinearProgressIndicator(
                         value: pct,
                         minHeight: 12,
-                        backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        backgroundColor: Theme.of(context)
+                            .colorScheme
+                            .surfaceContainerHighest,
                         color: AppTheme.emeraldPrimary,
                       ),
                     ),
@@ -421,9 +488,27 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
-                        _buildStatusBadge('On Time', period.onTimeCount, Colors.green),
-                        _buildStatusBadge('Qada', period.qadaCount, Colors.orange),
-                        _buildStatusBadge('Missed', period.missedCount, Colors.redAccent),
+                        _buildStatusBadge(
+                            'On Time', period.onTimeCount, Colors.green),
+                        _buildStatusBadge(
+                            'Qada', period.qadaCount, Colors.orange),
+                        _buildStatusBadge(
+                            'Missed', period.missedCount, Colors.redAccent),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _buildStatusBadge(
+                            'Mosque', period.mosqueCount, Colors.teal),
+                        _buildStatusBadge(
+                            'Home', period.homeCount, Colors.blue),
+                        _buildStatusBadge(
+                            'Takbir-e-Ula', period.takbirCount, Colors.green),
+                        _buildStatusBadge('Jamaat rakats missed',
+                            period.missedJamaatRakats, Colors.deepOrange),
                       ],
                     ),
                   ],
@@ -443,7 +528,8 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
       selected: isSelected,
       selectedColor: AppTheme.emeraldPrimary,
       labelStyle: TextStyle(
-        color: isSelected ? Colors.white : Theme.of(context).colorScheme.onSurface,
+        color:
+            isSelected ? Colors.white : Theme.of(context).colorScheme.onSurface,
         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
         fontSize: 12,
       ),
@@ -498,12 +584,15 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
     return Column(
       children: timings.map((t) {
         final record = todayRecords[t.name.toUpperCase()];
-        final isDone = record?.status == PrayerStatus.onTime || record?.status == PrayerStatus.qada;
+        final isDone = record?.status == PrayerStatus.onTime ||
+            record?.status == PrayerStatus.qada;
         final isNextToday = t.isNext && t.time.isAfter(now);
 
         return Card(
           margin: const EdgeInsets.only(bottom: 10),
-          color: isNextToday ? AppTheme.emeraldPrimary.withValues(alpha: 0.08) : null,
+          color: isNextToday
+              ? AppTheme.emeraldPrimary.withValues(alpha: 0.08)
+              : null,
           child: ListTile(
             leading: CircleAvatar(
               backgroundColor: isDone
@@ -514,7 +603,11 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
               child: Icon(
                 isDone ? Icons.check : Icons.access_time,
                 size: 20,
-                color: isDone ? Colors.green.shade800 : (isNextToday ? Colors.white : Theme.of(context).colorScheme.onSurfaceVariant),
+                color: isDone
+                    ? Colors.green.shade800
+                    : (isNextToday
+                        ? Colors.white
+                        : Theme.of(context).colorScheme.onSurfaceVariant),
               ),
             ),
             title: Text(
@@ -525,7 +618,12 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
               ),
             ),
             subtitle: Text(
-              record != null ? 'Status: ${record.status.label}${record.takbirEUla ? " (Takbir-e-Ula)" : ""}' : 'Pending',
+              record != null
+                  ? 'Status: ${record.status.label}'
+                      '${record.place == PrayerPlace.mosque ? " • Mosque" : record.place == PrayerPlace.home ? " • Home" : ""}'
+                      '${record.joinedRakats != null ? " • ${PrayerRecord.fardRakatCount(t.name) - record.joinedRakats!} rakats missed with Jamaat" : ""}'
+                      '${record.takbirEUla ? " • Takbir-e-Ula" : ""}'
+                  : 'Pending',
               style: const TextStyle(fontSize: 12),
             ),
             trailing: Text(
@@ -584,12 +682,14 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
                     SizedBox(width: 8),
                     Text(
                       'Quran Recitation',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                     ),
                   ],
                 ),
                 TextButton(
-                  onPressed: () => ref.read(currentTabProvider.notifier).state = 2,
+                  onPressed: () =>
+                      ref.read(currentTabProvider.notifier).state = 2,
                   child: const Text('Manage'),
                 ),
               ],
@@ -598,17 +698,22 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
             if (active != null) ...[
               Text(
                 'Schedule: ${active.displayTitle}',
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                style:
+                    const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
               ),
               const SizedBox(height: 4),
               Text(
                 'Recitation Time: ${active.recitationTime} • Frequency: ${active.frequency}',
-                style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
             ] else
               Text(
                 'No active Quran recitation schedule. Tap Manage to schedule.',
-                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13),
+                style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 13),
               ),
           ],
         ),
@@ -617,7 +722,8 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
   }
 
   Widget _buildTasksCard(List<dynamic> tasks) {
-    final pendingTasks = tasks.where((t) => t.status != TaskStatus.completed).toList();
+    final pendingTasks =
+        tasks.where((t) => t.status != TaskStatus.completed).toList();
 
     return Card(
       child: Padding(
@@ -634,12 +740,14 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
                     SizedBox(width: 8),
                     Text(
                       'Today\'s Tasks',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                     ),
                   ],
                 ),
                 TextButton(
-                  onPressed: () => ref.read(currentTabProvider.notifier).state = 4,
+                  onPressed: () =>
+                      ref.read(currentTabProvider.notifier).state = 4,
                   child: const Text('View All'),
                 ),
               ],
@@ -648,17 +756,22 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
             if (pendingTasks.isNotEmpty) ...[
               Text(
                 '${pendingTasks.length} task(s) remaining for today',
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                style:
+                    const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
               ),
               const SizedBox(height: 4),
               Text(
                 'Next: ${pendingTasks.first.title} (${pendingTasks.first.startTime})',
-                style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
             ] else
               Text(
                 'No pending tasks for today.',
-                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13),
+                style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 13),
               ),
           ],
         ),

@@ -4,6 +4,7 @@ import 'package:mynamaz_scheduler/core/ads/ad_service.dart';
 import 'package:mynamaz_scheduler/features/onboarding/presentation/screens/onboarding_screen.dart';
 import 'package:mynamaz_scheduler/features/onboarding/presentation/screens/splash_screen.dart';
 import 'package:mynamaz_scheduler/features/settings/presentation/screens/settings_screen.dart';
+import 'package:mynamaz_scheduler/features/prayer/presentation/screens/prayer_records_screen.dart';
 import 'package:mynamaz_scheduler/shared/widgets/main_shell_screen.dart';
 
 class AdNavigationObserver extends NavigatorObserver {
@@ -45,6 +46,17 @@ class AppRouter {
         GoRoute(
           path: '/settings',
           builder: (context, state) => const SettingsScreen(),
+        ),
+        GoRoute(
+          path: '/prayer-records',
+          builder: (context, state) => PrayerRecordsScreen(
+            initialPrayer: state.uri.queryParameters['prayer'],
+            initialView: state.uri.queryParameters['view'] == 'year'
+                ? PrayerRecordsView.year
+                : state.uri.queryParameters['view'] == 'day'
+                    ? PrayerRecordsView.day
+                    : PrayerRecordsView.pending,
+          ),
         ),
       ],
     );

@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mynamaz_scheduler/core/ads/ad_service.dart';
 import 'package:mynamaz_scheduler/shared/widgets/banner_ad_widget.dart';
 import 'package:mynamaz_scheduler/core/notifications/notification_service.dart';
@@ -236,6 +237,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     subtitle: const Text('Manually adjust prayer minutes'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => _showOffsetsDialog(context, settings),
+                  ),
+                  const Divider(height: 24),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.calendar_month, color: AppTheme.emeraldPrimary),
+                    title: const Text('Yearly Namaz calendar',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    subtitle: const Text('Browse every month, week, day and prayer time'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => context.push('/prayer-records?view=year'),
                   ),
                 ],
               ),

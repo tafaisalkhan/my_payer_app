@@ -314,7 +314,8 @@ class PrayerAlarmService : Service() {
                 .build()
 
             var player: MediaPlayer? = null
-            val isAdhan = (soundType == "ADHAN")
+            val isAdhan = soundType == "ADHAN" || soundType == "ADHAN_LONG"
+            var playsRemaining = if (soundType == "ADHAN_LONG") 2 else 1
 
             // 1. Try bundled raw resource
             try {
@@ -367,7 +368,13 @@ class PrayerAlarmService : Service() {
                 setVolume(1.0f, 1.0f)
                 setOnCompletionListener {
                     if (!isLooping) {
-                        stopSelfCleanly()
+                        playsRemaining--
+                        if (playsRemaining > 0) {
+                            seekTo(0)
+                            start()
+                        } else {
+                            stopSelfCleanly()
+                        }
                     }
                 }
                 setOnErrorListener { _, what, extra ->

@@ -170,6 +170,15 @@ class MainActivity: FlutterActivity() {
         channel.setMethodCallHandler { call, result ->
             val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
             when (call.method) {
+                "getFirstInstallTime" -> {
+                    try {
+                        @Suppress("DEPRECATION")
+                        val installed = packageManager.getPackageInfo(packageName, 0).firstInstallTime
+                        result.success(installed)
+                    } catch (e: Exception) {
+                        result.error("INSTALL_TIME_ERROR", e.message, null)
+                    }
+                }
                 "getSystemAlarmUri" -> {
                     try {
                         val alarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)

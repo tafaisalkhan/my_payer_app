@@ -2,10 +2,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mynamaz_scheduler/core/notifications/notification_service.dart';
 import 'package:mynamaz_scheduler/core/theme/app_theme.dart';
 import 'package:mynamaz_scheduler/features/prayer/presentation/screens/home_dashboard_screen.dart';
 import 'package:mynamaz_scheduler/features/prayer/presentation/screens/namaz_tracking_screen.dart';
+import 'package:mynamaz_scheduler/features/prayer/presentation/providers/prayer_providers.dart';
+import 'package:mynamaz_scheduler/features/prayer/domain/prayer_check_in_service.dart';
+import 'package:mynamaz_scheduler/features/prayer/domain/prayer_time_change_service.dart';
 import 'package:mynamaz_scheduler/features/qibla/presentation/screens/qibla_compass_screen.dart';
 import 'package:mynamaz_scheduler/features/quran/presentation/screens/quran_scheduler_screen.dart';
 import 'package:mynamaz_scheduler/features/tasks/presentation/screens/task_scheduler_screen.dart';
@@ -21,8 +25,11 @@ class MainShellScreen extends ConsumerStatefulWidget {
   ConsumerState<MainShellScreen> createState() => _MainShellScreenState();
 }
 
-class _MainShellScreenState extends ConsumerState<MainShellScreen> {
+class _MainShellScreenState extends ConsumerState<MainShellScreen>
+    with WidgetsBindingObserver {
   Timer? _alarmStatusTimer;
+  bool _checkInOpen = false;
+  bool _wasBackgrounded = false;
   bool _nativeAlarmRinging = false;
   final List<Widget> _screens = const [
     HomeDashboardScreen(),
@@ -35,6 +42,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     HardwareKeyboard.instance.addHandler(_handleHardwareKey);
     _refreshAlarmStatus();
     _alarmStatusTimer = Timer.periodic(
@@ -42,12 +50,52 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
       (_) => _refreshAlarmStatus(),
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) AdService.instance.onDashboardVisible();
+      if (mounted) {
+        AdService.instance.onDashboardVisible();
+        _openPendingRecords();
+      }
     });
+  }
+
+  Future<void> _openPendingRecords() async {
+    if (_checkInOpen) return;
+    _checkInOpen = true;
+    try {
+      await ref.read(todayPrayerRecordsProvider.notifier).loadTodayRecords();
+      await ref.read(prayerSettingsProvider.notifier).ready;
+      final location = await ref.read(locationDataProvider.future);
+      if (!mounted) return;
+      await PrayerTimeChangeService.check(ref.read(prayerTimingsProvider));
+      final pending = await PrayerCheckInService.load(
+        repository: ref.read(prayerRepositoryProvider),
+        latitude: location.latitude,
+        longitude: location.longitude,
+        settings: ref.read(prayerSettingsProvider),
+      );
+      if (!mounted) return;
+      if (pending.isEmpty) return;
+      await context.push<void>('/prayer-records');
+    } catch (error) {
+      debugPrint('Could not open prayer check-in: $error');
+    } finally {
+      _checkInOpen = false;
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      _wasBackgrounded = true;
+    } else if (state == AppLifecycleState.resumed && _wasBackgrounded) {
+      _wasBackgrounded = false;
+      _openPendingRecords();
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _alarmStatusTimer?.cancel();
     HardwareKeyboard.instance.removeHandler(_handleHardwareKey);
     super.dispose();
@@ -88,9 +136,9 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
               valueListenable:
                   NotificationService.instance.isAdhanPlayingNotifier,
               builder: (context, isPlaying, _) {
-                  if (!isPlaying && !_nativeAlarmRinging) {
-                    return const SizedBox.shrink();
-                  }
+                if (!isPlaying && !_nativeAlarmRinging) {
+                  return const SizedBox.shrink();
+                }
                 return Card(
                   elevation: 12,
                   color: const Color(0xFF0C3B2E),
