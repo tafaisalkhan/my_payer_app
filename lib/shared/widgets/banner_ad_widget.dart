@@ -30,6 +30,7 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
     _bannerAd = AdService.instance.createBannerAd(
       size: widget.size,
       onAdLoaded: (ad) {
+        AdService.instance.markAdLoadedForStreak();
         if (mounted) {
           setState(() {
             _isAdLoaded = true;
