@@ -660,15 +660,20 @@ class _PrayerRecordsScreenState extends ConsumerState<PrayerRecordsScreen> {
           ChoiceChip(
             label: Text(option.label),
             selected: _status == option,
-            onSelected: (_) => setState(() {
-              _status = option;
-              _error = null;
+            onSelected: (_) {
+              setState(() {
+                _status = option;
+                _error = null;
+                if (option != PrayerStatus.onTime) {
+                  _place = null;
+                  _joinedRakats = null;
+                  _takbirEUla = null;
+                }
+              });
               if (option != PrayerStatus.onTime) {
-                _place = null;
-                _joinedRakats = null;
-                _takbirEUla = null;
+                _save(item);
               }
-            }),
+            },
           ),
       ]),
       if (_status == PrayerStatus.onTime) ...[
@@ -679,14 +684,19 @@ class _PrayerRecordsScreenState extends ConsumerState<PrayerRecordsScreen> {
             ChoiceChip(
               label: Text(option == PrayerPlace.mosque ? 'Mosque' : 'Home'),
               selected: _place == option,
-              onSelected: (_) => setState(() {
-                _place = option;
+              onSelected: (_) {
+                setState(() {
+                  _place = option;
+                  if (option == PrayerPlace.home) {
+                    _joinedRakats = null;
+                    _takbirEUla = null;
+                  }
+                  _error = null;
+                });
                 if (option == PrayerPlace.home) {
-                  _joinedRakats = null;
-                  _takbirEUla = null;
+                  _save(item);
                 }
-                _error = null;
-              }),
+              },
             ),
         ]),
         if (_place == PrayerPlace.mosque) ...[
@@ -707,35 +717,51 @@ class _PrayerRecordsScreenState extends ConsumerState<PrayerRecordsScreen> {
                 },
               ),
           ]),
-          if (_takbirEUla == false)
-            Row(children: [
-              Expanded(child: Text('Rakats missed (of $fard)')),
-              DropdownButton<int>(
-                value: _joinedRakats == null ? null : fard - _joinedRakats!,
-                hint: const Text('Select'),
-                items: [
-                  for (var count = 0; count <= fard; count++)
-                    DropdownMenuItem(value: count, child: Text('$count'))
-                ],
-                onChanged: (value) => setState(() {
-                  _joinedRakats = value == null ? null : fard - value;
-                  _error = null;
-                }),
-              ),
-            ]),
+          if (_takbirEUla == false) ...[
+            const SizedBox(height: 8),
+            Text('Rakats missed (of $fard)'),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (var count = 0; count <= fard; count++)
+                  ChoiceChip(
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    label: Text('$count'),
+                    selected: _joinedRakats == fard - count,
+                    onSelected: _saving
+                        ? null
+                        : (_) {
+                            setState(() {
+                              _joinedRakats = fard - count;
+                              _error = null;
+                            });
+                            _save(item);
+                          },
+                  ),
+              ],
+            ),
+          ],
         ],
       ],
       if (_error != null)
         Text(_error!,
             style: TextStyle(color: Theme.of(context).colorScheme.error)),
       Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+        if (_saving)
+          const Padding(
+            padding: EdgeInsets.only(right: 12),
+            child: SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ),
         TextButton(
           onPressed: _saving ? null : () => setState(() => _editingKey = null),
           child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: _saving || _status == null ? null : () => _save(item),
-          child: Text(_saving ? 'Saving...' : 'Save'),
         ),
       ]),
     ]);
