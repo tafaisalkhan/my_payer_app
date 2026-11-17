@@ -72,11 +72,11 @@ class AdService {
     return '${minutes}m left';
   }
 
-  /// Google Test AdMob IDs by default (production IDs in gitignored admob_secrets.json)
-  static const String appId = String.fromEnvironment('ADMOB_APP_ID', defaultValue: 'ca-app-pub-3940256099942544~3347511713');
-  static const String bannerId = String.fromEnvironment('ADMOB_BANNER_ID', defaultValue: 'ca-app-pub-3940256099942544/6300978111');
-  static const String interstitialId = String.fromEnvironment('ADMOB_INTERSTITIAL_ID', defaultValue: 'ca-app-pub-3940256099942544/1033173712');
-  static const String rewardId = String.fromEnvironment('ADMOB_REWARDED_ID', defaultValue: 'ca-app-pub-3940256099942544/5224354917');
+  /// Production AdMob IDs from gitignored admob_secrets.json (--dart-define-from-file=admob_secrets.json)
+  static const String appId = String.fromEnvironment('ADMOB_APP_ID');
+  static const String bannerId = String.fromEnvironment('ADMOB_BANNER_ID');
+  static const String interstitialId = String.fromEnvironment('ADMOB_INTERSTITIAL_ID');
+  static const String rewardId = String.fromEnvironment('ADMOB_REWARDED_ID');
 
   static String get bannerAdUnitId {
     if (kIsWeb) return '';
