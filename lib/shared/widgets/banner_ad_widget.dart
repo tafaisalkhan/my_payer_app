@@ -38,6 +38,7 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
       },
       onAdFailedToLoad: (ad, error) {
         debugPrint('BannerAd failed to load: ${error.message}');
+        AdService.instance.markNoFillTodayAndNotify();
         ad.dispose();
         if (mounted) {
           setState(() {

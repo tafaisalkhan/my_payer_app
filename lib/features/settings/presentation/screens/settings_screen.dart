@@ -2,7 +2,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mynamaz_scheduler/core/ads/ad_service.dart';
+import 'package:mynamaz_scheduler/core/services/support_service.dart';
 import 'package:mynamaz_scheduler/shared/widgets/banner_ad_widget.dart';
+import 'package:mynamaz_scheduler/shared/widgets/no_ads_popup.dart';
 import 'package:mynamaz_scheduler/core/notifications/notification_service.dart';
 import 'package:mynamaz_scheduler/core/theme/app_theme.dart';
 import 'package:mynamaz_scheduler/features/prayer/data/repositories/prayer_repository.dart';
@@ -361,6 +363,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
           _buildSectionHeader('Premium Features'),
           _buildRemoveAdsCard(context),
+          const SizedBox(height: 20),
+
+          _buildSectionHeader('Support & Feedback'),
+          _buildSupportCard(context),
           const SizedBox(height: 20),
 
           _buildSectionHeader('Data & Privacy'),
@@ -780,28 +786,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                   ],
                 ),
-                const Divider(height: 24),
-                // Rewarded Ad Option
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppTheme.emeraldPrimary,
-                          side: const BorderSide(color: AppTheme.emeraldPrimary, width: 1.5),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
+                if (!AdService.instance.isAdsDisabledForSession) ...[
+                  const Divider(height: 24),
+                  // Rewarded Ad Option
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppTheme.emeraldPrimary,
+                            side: const BorderSide(color: AppTheme.emeraldPrimary, width: 1.5),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          icon: const Icon(Icons.card_giftcard, size: 18, color: AppTheme.goldAccent),
+                          label: const Text(
+                            'Watch Video (24h Free Ad-Free)',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          onPressed: () => _handleWatchRewardedAd(context),
                         ),
-                        icon: const Icon(Icons.card_giftcard, size: 18, color: AppTheme.goldAccent),
-                        label: const Text(
-                          'Watch Video (24h Free Ad-Free)',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        onPressed: () => _handleWatchRewardedAd(context),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
@@ -909,6 +917,67 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       onDismissed: () {
         if (context.mounted) setState(() {});
       },
+    );
+  }
+
+  Widget _buildSupportCard(BuildContext context) {
+    return Card(
+      child: Column(
+        children: [
+          ListTile(
+            leading: Icon(Icons.star_rounded, color: Colors.amber.shade700),
+            title: const Text('Rate App'),
+            subtitle: const Text('Leave a 5-star review on Google Play'),
+            trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+            onTap: () => NoAdsPopup.show(
+              context,
+              step: 0,
+              isAdFreePurchased: AdService.instance.isLifetimeRemoveAds,
+            ),
+          ),
+          const Divider(height: 1),
+          ListTile(
+            leading: const Icon(Icons.share_rounded, color: AppTheme.emeraldPrimary),
+            title: const Text('Share With Friends'),
+            subtitle: const Text('Invite others to stay consistent with Salah'),
+            trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+            onTap: () => SupportService.instance.shareApp(),
+          ),
+          const Divider(height: 1),
+          ListTile(
+            leading: Icon(Icons.coffee_rounded, color: Colors.brown.shade600),
+            title: const Text('Buy Developer a Coffee'),
+            subtitle: Text(
+              'Support future updates (${SupportService.instance.coffeePrice})',
+            ),
+            trailing: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.brown.shade600,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                SupportService.instance.coffeePrice,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+            onTap: () async {
+              final started = await SupportService.instance.buyCoffee();
+              if (!started && context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Store is unavailable right now. Please try again later.'),
+                  ),
+                );
+              }
+            },
+          ),
+        ],
+      ),
     );
   }
 }

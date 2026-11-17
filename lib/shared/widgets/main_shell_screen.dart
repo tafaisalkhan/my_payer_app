@@ -14,6 +14,7 @@ import 'package:mynamaz_scheduler/features/qibla/presentation/screens/qibla_comp
 import 'package:mynamaz_scheduler/features/quran/presentation/screens/quran_scheduler_screen.dart';
 import 'package:mynamaz_scheduler/features/tasks/presentation/screens/task_scheduler_screen.dart';
 import 'package:mynamaz_scheduler/core/ads/ad_service.dart';
+import 'package:mynamaz_scheduler/core/services/support_service.dart';
 import 'package:mynamaz_scheduler/shared/widgets/banner_ad_widget.dart';
 
 final currentTabProvider = StateProvider<int>((ref) => 0);
@@ -52,6 +53,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         AdService.instance.onDashboardVisible();
+        SupportService.instance.checkForAppUpdate(context);
         _openPendingRecords();
       }
     });
@@ -223,6 +225,13 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen>
               if (currentIndex != index) {
                 ref.read(currentTabProvider.notifier).state = index;
                 AdService.instance.registerNavigationAndMaybeShowInterstitial();
+                if (index == 0) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) {
+                      AdService.instance.showNoAdsPopupIfNeeded(context);
+                    }
+                  });
+                }
               }
             },
             indicatorColor:
