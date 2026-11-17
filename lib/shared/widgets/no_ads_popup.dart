@@ -6,12 +6,14 @@ class NoAdsPopup extends StatefulWidget {
   final int step;
   final bool isStreakReward;
   final bool isAdFreePurchased;
+  final bool isNoFill;
 
   const NoAdsPopup({
     super.key,
     required this.step,
     this.isStreakReward = false,
     this.isAdFreePurchased = false,
+    this.isNoFill = false,
   });
 
   static Future<void> show(
@@ -19,6 +21,7 @@ class NoAdsPopup extends StatefulWidget {
     required int step,
     bool isStreakReward = false,
     bool isAdFreePurchased = false,
+    bool isNoFill = false,
   }) {
     return showDialog<void>(
       context: context,
@@ -27,6 +30,7 @@ class NoAdsPopup extends StatefulWidget {
         step: step % 3,
         isStreakReward: isStreakReward,
         isAdFreePurchased: isAdFreePurchased,
+        isNoFill: isNoFill,
       ),
     );
   }
@@ -46,7 +50,10 @@ class _NoAdsPopupState extends State<NoAdsPopup> {
     if (widget.isStreakReward) {
       return '3-Day Streak! No Ads Today';
     }
-    return 'No Ads Today';
+    if (widget.isNoFill) {
+      return 'No Ads Today';
+    }
+    return 'Enjoying MyNamaz Scheduler?';
   }
 
   String get _subtitle {
@@ -56,7 +63,10 @@ class _NoAdsPopupState extends State<NoAdsPopup> {
     if (widget.isStreakReward) {
       return 'You opened the app 3 days in a row — enjoy an ad-free day on us!';
     }
-    return 'Ads are paused right now. Enjoy a peaceful, distraction-free experience.';
+    if (widget.isNoFill) {
+      return 'Ads are paused right now. Enjoy a peaceful, distraction-free experience.';
+    }
+    return 'Your feedback and support help us keep improving.';
   }
 
   String get _dismissText =>

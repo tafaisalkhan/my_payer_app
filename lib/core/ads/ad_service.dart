@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
@@ -17,7 +18,6 @@ class AdService {
   static const String _prefKeyStreakDays = 'consecutive_open_days';
   static const String _prefKeyLastOpenDate = 'last_open_date';
   static const String _prefKeyAdFreeStreakDate = 'ad_free_streak_date';
-  static const String _prefKeyPopupStep = 'no_ads_popup_step';
 
   bool _isInitialized = false;
   final ValueNotifier<bool> isInitializedNotifier = ValueNotifier<bool>(false);
@@ -26,6 +26,9 @@ class AdService {
   bool _isAdFreeToday = false;
   bool _noFillThisLaunch = false;
   bool _popupShownThisLaunch = false;
+  int _streakDays = 0;
+  String _adFreeStreakDate = '';
+  final Random _random = Random();
   InterstitialAd? _interstitialAd;
   bool _isInterstitialLoading = false;
 
@@ -52,6 +55,10 @@ class AdService {
   }
 
   bool get isAdsDisabledForSession => isAdsRemoved || _noFillThisLaunch;
+
+  /// Rewarded ads stay active on Day 4 streak if ads are working;
+  /// disabled only when remove_ads is purchased or ads fail to load (noFill).
+  bool get isRewardedDisabled => _isLifetimeRemoveAds || _noFillThisLaunch;
 
   static bool isValidAdUnitId(String id) {
     return id.isNotEmpty && id.startsWith('ca-app-pub-') && id.contains('/');
@@ -164,31 +171,50 @@ class AdService {
     final now = DateTime.now();
     final today = _dateKey(now);
     final yesterday = _dateKey(now.subtract(const Duration(days: 1)));
+    final tomorrow = _dateKey(now.add(const Duration(days: 1)));
 
     final lastDate = prefs.getString(_prefKeyLastOpenDate);
-    final adFreeStreakDate = prefs.getString(_prefKeyAdFreeStreakDate);
+    _adFreeStreakDate = prefs.getString(_prefKeyAdFreeStreakDate) ?? '';
+    _streakDays = prefs.getInt(_prefKeyStreakDays) ?? 0;
 
     if (lastDate == today) {
-      _isAdFreeToday = adFreeStreakDate == today;
+      _isAdFreeToday = _adFreeStreakDate == today;
       return;
     }
 
     int streak;
     if (lastDate == yesterday) {
-      streak = (prefs.getInt(_prefKeyStreakDays) ?? 0) + 1;
+      streak = _streakDays + 1;
     } else {
       streak = 1;
     }
 
     if (streak >= 3) {
-      _isAdFreeToday = true;
-      await prefs.setString(_prefKeyAdFreeStreakDate, today);
+      _adFreeStreakDate = tomorrow;
+      _streakDays = 0;
+      await prefs.setString(_prefKeyAdFreeStreakDate, tomorrow);
       await prefs.setInt(_prefKeyStreakDays, 0);
     } else {
-      _isAdFreeToday = false;
+      _streakDays = streak;
       await prefs.setInt(_prefKeyStreakDays, streak);
     }
+    _isAdFreeToday = _adFreeStreakDate == today;
     await prefs.setString(_prefKeyLastOpenDate, today);
+  }
+
+  String streakNotificationSuffix() {
+    if (_isLifetimeRemoveAds) return '';
+    final tomorrow = _dateKey(DateTime.now().add(const Duration(days: 1)));
+    if (_adFreeStreakDate == tomorrow) {
+      return ' Streak complete! Today is 100% Ad-Free (Banner & Interstitial off)!';
+    }
+    if (_streakDays == 1) {
+      return ' Open today (Day 2/3) toward a Free Ad-Free Day!';
+    }
+    if (_streakDays == 2) {
+      return ' 1 more day (Day 3/3) to unlock tomorrow Ad-Free!';
+    }
+    return '';
   }
 
   Future<void> _activateLifetimeRemoveAds() async {
@@ -212,14 +238,9 @@ class AdService {
 
   Future<void> showNoAdsPopupIfNeeded(BuildContext context) async {
     if (_popupShownThisLaunch) return;
-    if (!_isLifetimeRemoveAds && !_isAdFreeToday && !_noFillThisLaunch) {
-      return;
-    }
 
     _popupShownThisLaunch = true;
-    final prefs = await SharedPreferences.getInstance();
-    final step = prefs.getInt(_prefKeyPopupStep) ?? 0;
-    await prefs.setInt(_prefKeyPopupStep, (step + 1) % 3);
+    final step = _random.nextInt(3);
 
     if (!context.mounted) return;
     await NoAdsPopup.show(
@@ -227,6 +248,7 @@ class AdService {
       step: step,
       isStreakReward: _isAdFreeToday && !_isLifetimeRemoveAds,
       isAdFreePurchased: _isLifetimeRemoveAds,
+      isNoFill: _noFillThisLaunch,
     );
   }
 
@@ -364,7 +386,7 @@ class AdService {
 
   /// 3. REWARDED AD
   void loadRewardedAd() {
-    if (isAdsDisabledForSession || !isValidAdUnitId(rewardedAdUnitId)) return;
+    if (isRewardedDisabled || !isValidAdUnitId(rewardedAdUnitId)) return;
     if (_isRewardedLoading || _rewardedAd != null) return;
     _isRewardedLoading = true;
 
@@ -391,7 +413,7 @@ class AdService {
     required Function(RewardItem reward) onUserEarnedReward,
     VoidCallback? onDismissed,
   }) {
-    if (isAdsDisabledForSession) {
+    if (isRewardedDisabled) {
       onUserEarnedReward(RewardItem(100, 'blessing_points'));
       onDismissed?.call();
       return;

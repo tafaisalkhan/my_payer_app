@@ -789,7 +789,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ValueListenableBuilder<bool>(
                   valueListenable: AdService.instance.isNoFillNotifier,
                   builder: (context, isNoFill, _) {
-                    if (isNoFill || AdService.instance.isAdsDisabledForSession) {
+                    if (isNoFill || AdService.instance.isRewardedDisabled) {
                       return const SizedBox.shrink();
                     }
                     return Column(

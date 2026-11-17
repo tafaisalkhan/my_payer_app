@@ -6,6 +6,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
+import 'package:mynamaz_scheduler/core/ads/ad_service.dart';
 import 'package:mynamaz_scheduler/core/constants/app_constants.dart';
 
 class NotificationService {
@@ -226,13 +227,17 @@ class NotificationService {
         soundType = 'ALARM';
       }
 
+      final effectiveBody = title.toLowerCase().contains('fajr')
+          ? '$body${AdService.instance.streakNotificationSuffix()}'
+          : body;
+
       // Single dedicated native alarm service:
       // Stops YouTube/other apps, plays ONE sound, displays ONE notification, resumes previous app on finish
       await scheduleNativeAlarm(
         id: id,
         scheduledDate: scheduledDate,
         name: title,
-        title: body,
+        title: effectiveBody,
         eventType: eventType,
         soundType: soundType,
       );
