@@ -463,10 +463,14 @@ final namazProgressStatsProvider =
     FutureProvider<NamazProgressStats>((ref) async {
   final repo = ref.watch(prayerRepositoryProvider);
   final todayMap = ref.watch(todayPrayerRecordsProvider);
+  final location = ref.watch(locationDataProvider).valueOrNull;
+  final settings = ref.watch(prayerSettingsProvider);
   final allRecords = await repo.getAllPrayerRecords();
 
   final now = DateTime.now();
-  final installed = await PrayerCheckInService.installDate();
+  final installedAt = await PrayerCheckInService.installDateTime();
+  final installed =
+      DateTime(installedAt.year, installedAt.month, installedAt.day);
   final installedIso = DateFormat('yyyy-MM-dd').format(installed);
   final todayIso = DateFormat('yyyy-MM-dd').format(now);
   final weekStartIso = DateFormat('yyyy-MM-dd')
@@ -475,6 +479,16 @@ final namazProgressStatsProvider =
       DateFormat('yyyy-MM-dd').format(DateTime(now.year, now.month, 1));
   final yearStartIso =
       DateFormat('yyyy-MM-dd').format(DateTime(now.year, 1, 1));
+
+  final installDayCount = location == null
+      ? 5
+      : PrayerCheckInService.installDayPrayerCount(
+          repository: repo,
+          latitude: location.latitude,
+          longitude: location.longitude,
+          settings: settings,
+          installTime: installedAt,
+        );
 
   PeriodProgress summarize(Iterable<PrayerRecord> records, int total) {
     var onTime = 0, qada = 0, missed = 0;
@@ -512,20 +526,32 @@ final namazProgressStatsProvider =
       r.date.compareTo(trackedStart(start)) >= 0 &&
       r.date.compareTo(todayIso) <= 0);
 
-  int trackedTotal(String start) {
+  int trackedTotal(String start, int recordedCount) {
     final first = DateTime.parse(trackedStart(start));
     final today = DateTime(now.year, now.month, now.day);
-    return first.isAfter(today) ? 0 : (today.difference(first).inDays + 1) * 5;
+    if (first.isAfter(today)) return 0;
+    final baseTotal = first.isAtSameMomentAs(installed)
+        ? installDayCount + (today.difference(first).inDays * 5)
+        : (today.difference(first).inDays + 1) * 5;
+    return recordedCount > baseTotal ? recordedCount : baseTotal;
   }
+
+  final dailyRecords = todayMap.values
+      .where((r) =>
+          r.date.compareTo(installedIso) >= 0 && r.date.compareTo(todayIso) <= 0)
+      .toList();
+  final weeklyRecords = since(weekStartIso).toList();
+  final monthlyRecords = since(monthStartIso).toList();
+  final yearlyRecords = since(yearStartIso).toList();
 
   return NamazProgressStats(
     daily: summarize(
-        todayMap.values.where((r) =>
-            r.date.compareTo(installedIso) >= 0 &&
-            r.date.compareTo(todayIso) <= 0),
-        trackedTotal(todayIso)),
-    weekly: summarize(since(weekStartIso), trackedTotal(weekStartIso)),
-    monthly: summarize(since(monthStartIso), trackedTotal(monthStartIso)),
-    yearly: summarize(since(yearStartIso), trackedTotal(yearStartIso)),
+        dailyRecords, trackedTotal(todayIso, dailyRecords.length)),
+    weekly: summarize(
+        weeklyRecords, trackedTotal(weekStartIso, weeklyRecords.length)),
+    monthly: summarize(
+        monthlyRecords, trackedTotal(monthStartIso, monthlyRecords.length)),
+    yearly: summarize(
+        yearlyRecords, trackedTotal(yearStartIso, yearlyRecords.length)),
   );
 });
