@@ -15,6 +15,31 @@ class DailyMosqueImage {
   const DailyMosqueImage(this.image, this.credit);
 }
 
+bool _isValidImageBytes(List<int> bytes) {
+  if (bytes.length < 12) return false;
+  final isJpeg = bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF;
+  final isPng = bytes[0] == 0x89 &&
+      bytes[1] == 0x50 &&
+      bytes[2] == 0x4E &&
+      bytes[3] == 0x47;
+  return isJpeg || isPng;
+}
+
+Future<bool> _isValidImageFile(File file) async {
+  try {
+    if (!await file.exists()) return false;
+    final len = await file.length();
+    if (len < 12) return false;
+    final header = await file.openRead(0, 12).fold<List<int>>(
+      <int>[],
+      (acc, chunk) => acc..addAll(chunk),
+    );
+    return _isValidImageBytes(header);
+  } catch (_) {
+    return false;
+  }
+}
+
 final dailyMosqueImageProvider = FutureProvider<DailyMosqueImage>((ref) async {
   const fallback = DailyMosqueImage(
     AssetImage('assets/images/mosque_hero.jpg'),
@@ -38,15 +63,18 @@ final dailyMosqueImageProvider = FutureProvider<DailyMosqueImage>((ref) async {
     final imageFile = File(path.join(directory.path, 'mosque_day_$dayKey.jpg'));
     final creditFile =
         File(path.join(directory.path, 'mosque_day_$dayKey.txt'));
-    if (await imageFile.exists() && await imageFile.length() > 0) {
+    if (await _isValidImageFile(imageFile)) {
       return DailyMosqueImage(
         FileImage(imageFile),
         await creditFile.exists() ? await creditFile.readAsString() : null,
       );
+    } else if (await imageFile.exists()) {
+      await imageFile.delete();
     }
 
     final client = HttpClient()
-      ..userAgent = 'MyNamazScheduler/1.0 (daily mosque photo)';
+      ..userAgent =
+          'MyNamazScheduler/1.0 (https://play.google.com/store/apps/details?id=com.mynamaz.scheduler; android)';
     try {
       final api = Uri.https('commons.wikimedia.org', '/w/api.php', {
         'action': 'query',
@@ -56,7 +84,7 @@ final dailyMosqueImageProvider = FutureProvider<DailyMosqueImage>((ref) async {
         'gcmlimit': '100',
         'prop': 'imageinfo',
         'iiprop': 'url|mime|extmetadata',
-        'iiurlwidth': '1200',
+        'iiurlwidth': '1280',
         'format': 'json',
       });
       final response =
@@ -76,7 +104,7 @@ final dailyMosqueImageProvider = FutureProvider<DailyMosqueImage>((ref) async {
         final info = (page['imageinfo'] as List?)?.firstOrNull as Map?;
         return info != null &&
             (info['mime'] == 'image/jpeg' || info['mime'] == 'image/png') &&
-            info['thumburl'] is String;
+            (info['thumburl'] is String || info['url'] is String);
       }).toList()
             ..sort((a, b) => '${a['title']}'.compareTo('${b['title']}'));
       if (candidates.isEmpty) throw const FormatException('No mosque photos');
@@ -84,37 +112,43 @@ final dailyMosqueImageProvider = FutureProvider<DailyMosqueImage>((ref) async {
       for (var offset = 0; offset < candidates.length && offset < 5; offset++) {
         final page = candidates[(dayNumber + offset) % candidates.length];
         final info = (page['imageinfo'] as List).first as Map;
-        try {
-          final photoResponse = await (await client
-                  .getUrl(Uri.parse(info['thumburl'] as String))
-                  .timeout(const Duration(seconds: 12)))
-              .close()
-              .timeout(const Duration(seconds: 12));
-          if (photoResponse.statusCode != HttpStatus.ok) continue;
-          final bytes = await photoResponse.fold<List<int>>(
-              <int>[],
-              (list, chunk) =>
-                  list..addAll(chunk)).timeout(const Duration(seconds: 15));
-          if (bytes.isEmpty) continue;
+        final downloadUrls = <String>[
+          if (info['thumburl'] is String) info['thumburl'] as String,
+          if (info['url'] is String) info['url'] as String,
+        ];
+        for (final imageUrl in downloadUrls) {
+          try {
+            final photoResponse = await (await client
+                    .getUrl(Uri.parse(imageUrl))
+                    .timeout(const Duration(seconds: 12)))
+                .close()
+                .timeout(const Duration(seconds: 12));
+            if (photoResponse.statusCode != HttpStatus.ok) continue;
+            final bytes = await photoResponse.fold<List<int>>(
+                <int>[],
+                (list, chunk) =>
+                    list..addAll(chunk)).timeout(const Duration(seconds: 15));
+            if (!_isValidImageBytes(bytes)) continue;
 
-          await imageFile.writeAsBytes(bytes, flush: true);
-          final metadata = info['extmetadata'] as Map?;
-          final artistHtml =
-              (metadata?['Artist'] as Map?)?['value'] as String? ??
-                  'Wikimedia Commons contributor';
-          final artist = artistHtml
-              .replaceAll(RegExp(r'<[^>]*>'), '')
-              .replaceAll('&amp;', '&')
-              .trim();
-          final license =
-              (metadata?['LicenseShortName'] as Map?)?['value'] as String? ??
-                  '';
-          final credit =
-              '${artist.isEmpty ? 'Wikimedia Commons contributor' : artist} / Wikimedia Commons${license.isEmpty ? '' : ' ($license)'}';
-          await creditFile.writeAsString(credit);
-          return DailyMosqueImage(FileImage(imageFile), credit);
-        } catch (error) {
-          debugPrint('Could not download mosque photo: $error');
+            await imageFile.writeAsBytes(bytes, flush: true);
+            final metadata = info['extmetadata'] as Map?;
+            final artistHtml =
+                (metadata?['Artist'] as Map?)?['value'] as String? ??
+                    'Wikimedia Commons contributor';
+            final artist = artistHtml
+                .replaceAll(RegExp(r'<[^>]*>'), '')
+                .replaceAll('&amp;', '&')
+                .trim();
+            final license =
+                (metadata?['LicenseShortName'] as Map?)?['value'] as String? ??
+                    '';
+            final credit =
+                '${artist.isEmpty ? 'Wikimedia Commons contributor' : artist} / Wikimedia Commons${license.isEmpty ? '' : ' ($license)'}';
+            await creditFile.writeAsString(credit);
+            return DailyMosqueImage(FileImage(imageFile), credit);
+          } catch (error) {
+            debugPrint('Could not download mosque photo ($imageUrl): $error');
+          }
         }
       }
     } catch (error) {
@@ -123,7 +157,7 @@ final dailyMosqueImageProvider = FutureProvider<DailyMosqueImage>((ref) async {
       client.close();
     }
 
-    // Keep the most recent downloaded photo visible while offline.
+    // Keep the most recent valid downloaded photo visible while offline.
     final previous = directory
         .listSync()
         .whereType<File>()
@@ -133,7 +167,7 @@ final dailyMosqueImageProvider = FutureProvider<DailyMosqueImage>((ref) async {
         .toList()
       ..sort((a, b) => b.path.compareTo(a.path));
     for (final file in previous) {
-      if (await file.length() == 0) continue;
+      if (!await _isValidImageFile(file)) continue;
       final credit = File(file.path.replaceAll(RegExp(r'\.jpg$'), '.txt'));
       return DailyMosqueImage(
         FileImage(file),

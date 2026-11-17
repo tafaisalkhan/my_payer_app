@@ -51,6 +51,7 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
           ref.invalidate(voluntaryPrayerTimingsProvider);
           ref.invalidate(todayPrayerRecordsProvider);
           ref.invalidate(dashboardTodayTasksProvider);
+          ref.invalidate(dailyMosqueImageProvider);
         }
         _checkAndAutoPlayAdhan();
         setState(() {});
