@@ -36,6 +36,7 @@ class AdService {
   DateTime? get rewardAdFreeUntil => _rewardAdFreeUntil;
 
   final ValueNotifier<bool> isAdsRemovedNotifier = ValueNotifier<bool>(false);
+  final ValueNotifier<bool> isNoFillNotifier = ValueNotifier<bool>(false);
 
   bool get isLifetimeRemoveAds => _isLifetimeRemoveAds;
   bool get isAdFreeToday => _isAdFreeToday;
@@ -204,6 +205,9 @@ class AdService {
 
   void markNoFillTodayAndNotify() {
     _noFillThisLaunch = true;
+    if (!isNoFillNotifier.value) {
+      isNoFillNotifier.value = true;
+    }
   }
 
   Future<void> showNoAdsPopupIfNeeded(BuildContext context) async {

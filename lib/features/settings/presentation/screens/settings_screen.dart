@@ -786,30 +786,43 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                   ],
                 ),
-                if (!AdService.instance.isAdsDisabledForSession) ...[
-                  const Divider(height: 24),
-                  // Rewarded Ad Option
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppTheme.emeraldPrimary,
-                            side: const BorderSide(color: AppTheme.emeraldPrimary, width: 1.5),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                          icon: const Icon(Icons.card_giftcard, size: 18, color: AppTheme.goldAccent),
-                          label: const Text(
-                            'Watch Video (24h Free Ad-Free)',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          onPressed: () => _handleWatchRewardedAd(context),
+                ValueListenableBuilder<bool>(
+                  valueListenable: AdService.instance.isNoFillNotifier,
+                  builder: (context, isNoFill, _) {
+                    if (isNoFill || AdService.instance.isAdsDisabledForSession) {
+                      return const SizedBox.shrink();
+                    }
+                    return Column(
+                      children: [
+                        const Divider(height: 24),
+                        // Rewarded Ad Option
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppTheme.emeraldPrimary,
+                                  side: const BorderSide(
+                                      color: AppTheme.emeraldPrimary, width: 1.5),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12)),
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                ),
+                                icon: const Icon(Icons.card_giftcard,
+                                    size: 18, color: AppTheme.goldAccent),
+                                label: const Text(
+                                  'Watch Video (24h Free Ad-Free)',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                                onPressed: () => _handleWatchRewardedAd(context),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
-                  ),
-                ],
+                      ],
+                    );
+                  },
+                ),
               ],
             ),
           ),
